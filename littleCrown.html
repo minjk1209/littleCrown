@@ -545,6 +545,12 @@
       }
   }
 
+  // 칸 가장자리 판정 폭. 원래 50px 칸에 18px로 고정돼 있었는데, 화면이 좁아져
+  // 칸이 36px 아래로 내려가면 isUp 영역과 isDown 영역이 겹친다. 그러면
+  // 어느 지점을 눌러도 둘 다 참이 되어 단일 숫자 베팅이 아예 불가능해진다.
+  // 칸 너비에 비례시켜 어떤 화면에서도 같은 비율을 유지한다. (50 * 0.36 = 18)
+  const EDGE_RATIO = 0.36;
+
   function handleInsideBet(e, num, isZeroArea, row, col) {
       if (isSpinning) return; handleKeptBets();
       if (currentChip > balance) { msgBox.innerText = "잔고가 부족합니다."; return; }
@@ -557,13 +563,15 @@
           chipY = rect.top - boardRect.top + rect.height/2;
           if (currentTable === 'AM') {
               const y = e.offsetY; const h = e.target.clientHeight;
-              if (num === 0 && y < 18) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
-              else if (num === '00' && y > h - 18) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
+              const edge = e.target.clientWidth * EDGE_RATIO;
+              if (num === 0 && y < edge) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
+              else if (num === '00' && y > h - edge) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
           }
       } else {
           const x = e.offsetX; const y = e.offsetY; const w = e.target.clientWidth; const h = e.target.clientHeight; const rect = e.target.getBoundingClientRect();
           const c = Math.ceil(num / 3); const r = row; 
-          let isUp = y < 18; let isDown = y > h - 18; let isLeft = x < 18; let isRight = x > w - 18;
+          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
+          let isUp = y < eY; let isDown = y > h - eY; let isLeft = x < eX; let isRight = x > w - eX;
           
           chipX = rect.left - boardRect.left + w / 2; 
           chipY = rect.top - boardRect.top + h / 2;
@@ -602,9 +610,10 @@
   }
   document.querySelectorAll('.out-cell').forEach(el => { el.addEventListener('click', (e) => handleOutsideBet(e, el.dataset.bet)); });
 
+  // 칩 지름이 폰에서 20px 안팎이라 소수점 첫째 자리까지만 쓴다. (1234 -> 1.2K)
   function formatChip(amount) {
-      if(amount >= 1000000) return (amount/1000000) + 'M';
-      if(amount >= 1000) return (amount/1000) + 'K';
+      if(amount >= 1000000) return +(amount/1000000).toFixed(1) + 'M';
+      if(amount >= 1000) return +(amount/1000).toFixed(1) + 'K';
       return amount;
   }
 
@@ -694,11 +703,13 @@
           targets = [num];
           chipX = rect.left - boardRect.left + rect.width/2; chipY = rect.top - boardRect.top + rect.height/2;
           if (currentTable === 'AM') {
-              if (num === 0 && offsetY < 18) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
-              else if (num === '00' && offsetY > h - 18) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
+              const edge = w * EDGE_RATIO;
+              if (num === 0 && offsetY < edge) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
+              else if (num === '00' && offsetY > h - edge) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
           }
       } else {
-          let isUp = offsetY < 18; let isDown = offsetY > h - 18; let isLeft = offsetX < 18; let isRight = offsetX > w - 18;
+          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
+          let isUp = offsetY < eY; let isDown = offsetY > h - eY; let isLeft = offsetX < eX; let isRight = offsetX > w - eX;
           chipX = rect.left - boardRect.left + w / 2; chipY = rect.top - boardRect.top + h / 2;
           const c = Math.ceil(num / 3); const r = row;
           if (isLeft && c === 1) { 
@@ -896,6 +907,8 @@
   }
 
   // 💡 수정됨: 스핀 결과 처리 시 관전 모드 메시지 분기
+  const HISTORY_MAX = 300;   // 테이블당 보관할 최근 스핀 결과 개수
+
   function calculatePayout(winNum) {
       let winnings = 0;
       for (let key in placedBets) {
@@ -919,7 +932,10 @@
       balance += winnings; updateUI();
       
       let histArr = currentTable === 'EU' ? historyEU : historyAM; let freqObj = currentTable === 'EU' ? freqEU : freqAM;
-      histArr.push(winNum); freqObj[winNum]++; saveHistory(); updateAnalyticsBoard();
+      histArr.push(winNum); freqObj[winNum]++;
+      // 화면에는 최근 20개만 쓰지만 기록은 계속 쌓인다. localStorage가 무한히 커지지 않게 잘라낸다.
+      if (histArr.length > HISTORY_MAX) histArr.splice(0, histArr.length - HISTORY_MAX);
+      saveHistory(); updateAnalyticsBoard();
 
       if (totalBetAmount === 0) { 
           msgBox.innerText = `결과: ${winNum} - (관전 스핀) 다음 판에 배팅해 보세요!`; 
@@ -985,16 +1001,17 @@
           let providedChecksum = p[3];
           let expectedChecksum = btoa(amt + "CASINO" + rand).replace(/=/g, '').substr(0, 6).toUpperCase();
 
+          // 체크섬 알고리즘이 이 파일 안에 그대로 들어 있어서 진짜 위조는 어차피 막지 못한다.
+          // 몰수는 코드를 한 글자 잘못 옮겨적은 사람만 처벌하게 되므로 그냥 거절한다.
           if (providedChecksum !== expectedChecksum) {
-              balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
-              alert("🚨 [보안국 긴급 알림]\n\n위조 수표(금액 조작) 사용이 적발되었습니다!\n무관용 원칙에 따라 귀하의 지갑과 금고의 모든 자산이 0원으로 강제 몰수됩니다.");
+              alert("❌ 코드가 올바르지 않습니다.\n\n오타가 없는지 다시 확인해 주세요.\n(자산에는 아무 변화도 없습니다)");
               return;
           }
 
           let uniqueId = rand + providedChecksum;
           if(usedVouchers.includes(uniqueId)) {
-              balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
-              alert("🚨 [보안국 긴급 알림]\n\n폐기된 수표를 재사용하려는 부정 행위가 적발되었습니다!\n징벌적 조치로 귀하의 지갑과 금고의 모든 자산이 0원으로 몰수됩니다.");
+              // 클립보드에 남은 코드를 다시 붙여넣는 실수로도 걸리므로 몰수하지 않는다.
+              alert("❌ 이미 사용된 수표입니다.\n\n한 번 입금한 수표는 다시 쓸 수 없습니다.\n(자산에는 아무 변화도 없습니다)");
           } else {
               balance+=amt; 
               usedVouchers.push(uniqueId); 
