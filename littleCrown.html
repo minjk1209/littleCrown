@@ -57,6 +57,7 @@
   .deck-options label { cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: color 0.2s; }
   .deck-options input[type="radio"] { accent-color: #2ECC71; cursor: pointer; }
 
+  .stats-row { display: flex; width: 100%; max-width: 850px; margin-bottom: 15px; }
   .analytics-panel { flex-direction: column; justify-content: center; align-items: center; gap: 10px; border-color: #555; background: rgba(30,30,30,0.9); width: 100%; flex: 2; }
   .history-container { display: flex; align-items: flex-end; justify-content: center; flex-wrap: wrap; gap: 5px; min-height: 45px; width: 100%; }
   .ball-wrapper { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 5px; }
@@ -191,12 +192,7 @@
       </div>
       <div class="dealer-name" id="dealerName">Virtual Dealer: MULBUM</div>
   </div>
-  
-  <div class="timer-board">
-      <div class="timer-label">LIVE AUTO SPIN</div>
-      <div id="spinTimerText">00:30</div>
-  </div>
-  
+
   <div class="top-dashboard">
     <div class="dashboard-left">
       <div class="panel-base deck-panel">
@@ -207,14 +203,8 @@
             <label><input type="radio" name="betMode" value="3"> 3) 승리 시에만 유지</label>
         </div>
       </div>
-      <div class="panel-base analytics-panel">
-        <div class="history-container" id="historyDisplay">-</div>
-        <div class="stat-box">
-            <span class="stat-hot">🔥 HOT: <span id="hotDisplay">-</span></span> &nbsp;|&nbsp; <span class="stat-cold">❄️ COLD: <span id="coldDisplay">-</span></span>
-        </div>
-      </div>
     </div>
-    
+
     <div class="dashboard-right">
       <div class="panel-base vault-panel">
         <div class="vault-title">VIP Vault</div>
@@ -229,6 +219,20 @@
               <button class="btn-vault" id="btnRedeemVoucher" style="background:#f39c12; border-color:#f1c40f;">수표 입금</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="timer-board">
+      <div class="timer-label">LIVE AUTO SPIN</div>
+      <div id="spinTimerText">00:30</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="panel-base analytics-panel">
+      <div class="history-container" id="historyDisplay">-</div>
+      <div class="stat-box">
+          <span class="stat-hot">🔥 HOT: <span id="hotDisplay">-</span></span> &nbsp;|&nbsp; <span class="stat-cold">❄️ COLD: <span id="coldDisplay">-</span></span>
       </div>
     </div>
   </div>

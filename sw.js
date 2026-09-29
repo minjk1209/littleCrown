@@ -2,7 +2,7 @@
 //
 // CACHE 이름의 숫자를 올리면 기존 캐시를 버리고 새로 받는다.
 // 게임을 수정한 뒤에는 반드시 올려야 폰에 반영된다.
-const CACHE = 'littlecrown-v4';
+const CACHE = 'littlecrown-v5';
 
 const ASSETS = [
   './index.html',
