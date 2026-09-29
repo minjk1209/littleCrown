@@ -101,6 +101,7 @@
   .btn-sys { background: #444; color: white; border: 1px solid #777; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
   .btn-sys:hover { background: #555; transform: translateY(-1px); } 
   .btn-sys.undo { background: #e67e22; border-color: #d35400; } .btn-sys.double { background: #8e44ad; border-color: #9b59b6; } .btn-sys.recharge { background: #16a085; border-color: #1abc9c; }
+  .btn-sys.recharge:disabled { background: #2c3e50; color: #7f8c8d; border-color: #34495e; cursor: not-allowed; transform: none; }
   
   .controls { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; max-width: 850px; } 
   .chip-selector { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -1002,12 +1003,39 @@
       }
   });
   
-  // 충전: 대입(=)이 아니라 더하기(+=). 잔액이 있어도 깎이지 않는다.
+  // 충전한 날짜를 localStorage에 남긴다. 횟수를 메모리에만 세면
+  // 새로고침으로 초기화되어 제한이 무의미해진다(예전 Reset 버튼의 버그).
+  function todayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function canRecharge() {
+      return localStorage.getItem('casino_vip_recharge_day') !== todayKey();
+  }
+
+  function updateRechargeButton() {
+      const btn = document.getElementById('btnRecharge');
+      const ok = canRecharge();
+      btn.disabled = !ok;
+      btn.innerText = ok ? `💰 $${RECHARGE_AMOUNT.toLocaleString()} 충전` : '💰 충전 완료 (내일 다시)';
+  }
+
   document.getElementById('btnRecharge').addEventListener('click', () => {
-      balance += RECHARGE_AMOUNT;
+      if (!canRecharge()) {
+          msgBox.innerText = '⏳ 충전은 하루 한 번만 가능합니다. 자정이 지나면 다시 충전할 수 있습니다.';
+          return;
+      }
+      balance += RECHARGE_AMOUNT;   // 대입(=)이 아니라 더하기(+=)
+      localStorage.setItem('casino_vip_recharge_day', todayKey());
+      updateRechargeButton();
       updateUI();
       msgBox.innerText = `💰 $${RECHARGE_AMOUNT.toLocaleString()} 충전 완료. (지갑: $${balance.toLocaleString()})`;
   });
+
+  updateRechargeButton();
+  // 자정을 넘겨 켜둔 경우에도 버튼이 알아서 풀리도록 한다.
+  setInterval(updateRechargeButton, 60000);
 
   function updateAnalyticsBoard() {
       let histArr = currentTable === 'EU' ? historyEU : historyAM;
