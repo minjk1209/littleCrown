@@ -1,0 +1,16 @@
+{
+  "name": "Little Crown Casino",
+  "short_name": "LittleCrown",
+  "description": "오프라인으로 동작하는 VIP 룰렛 테이블",
+  "lang": "ko",
+  "start_url": "./littleCrown.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

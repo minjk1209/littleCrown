@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CASINO - Ultimate VIP Roulette (Responsive & Sec Update)</title>
+
+<!-- PWA: 홈 화면에 설치하면 비행기모드에서도 실행된다 -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1a1a1a">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="LittleCrown">
+<style>
+  /* 보드 한 칸 크기를 화면 폭에 맞춰 연속적으로 줄인다.
+     보드 전체 폭 = --cell * 14. 44px는 body/컨테이너 패딩+테두리 몫. */
+  :root {
+    --cell: min(50px, calc((100vw - 44px) / 14));
+    --wheel: min(300px, calc(100vw - 50px));
+  }
+  body { background-color: #1a1a1a; background-image: radial-gradient(circle at top, #2b2b2b 0%, #111 80%); color: #ffffff; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; user-select: none; overflow-x: hidden; }
+  
+  .top-bar { display: flex; width: 100%; max-width: 850px; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .table-selector { display: flex; gap: 20px; }
+  .btn-table { background: #333; color: #888; border: 2px solid #555; padding: 10px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.3s; }
+  .btn-table.active { background: linear-gradient(to bottom, #D4AF37, #aa8529); color: black; border-color: #FFD700; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); }
+  
+  /* VIP SHOP 버튼 */
+  .btn-shop { background: linear-gradient(145deg, #8e44ad, #2c3e50); border: 2px solid #9b59b6; color: white; padding: 10px 25px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 0 15px rgba(155, 89, 182, 0.6); transition: 0.3s; animation: pulseShop 2s infinite; }
+  .btn-shop:hover { transform: scale(1.05); filter: brightness(1.2); }
+  @keyframes pulseShop { 0% { box-shadow: 0 0 10px #9b59b6; } 50% { box-shadow: 0 0 25px #e056fd; } 100% { box-shadow: 0 0 10px #9b59b6; } }
+
+  .dealer-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; animation: glow 3s infinite alternate; }
+  @keyframes glow { from { filter: drop-shadow(0 0 10px rgba(52, 152, 219, 0.4)); } to { filter: drop-shadow(0 0 20px rgba(52, 152, 219, 0.8)); } }
+  
+  /* 딜러 아바타 */
+  .dealer-avatar { width: 120px; height: 120px; border-radius: 50%; border: 3px solid #D4AF37; box-shadow: 0 5px 15px rgba(0,0,0,0.8); background-size: cover; background-position: center; background-color: #444; margin-bottom: 10px; cursor: pointer; position: relative; transition: transform 0.2s; }
+  .dealer-avatar:hover { transform: scale(1.05); }
+  .camera-icon { position: absolute; bottom: 0; right: 0; background: #333; border-radius: 50%; padding: 6px; font-size: 1rem; border: 2px solid gold; display: flex; justify-content: center; align-items: center; }
+  .dealer-placeholder { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: center; font-size: 3rem; font-weight: bold; color: #D4AF37; opacity: 0.5; letter-spacing: 2px; pointer-events: none; }
+  
+  .dealer-name { background: linear-gradient(145deg, #2980b9, #2c3e50); color: white; padding: 5px 20px; border-radius: 20px; font-size: 1rem; font-weight: bold; letter-spacing: 2px; border: 1px solid #D4AF37; }
+  
+  .timer-board { background: #000; border: 3px solid #D4AF37; padding: 10px 40px; border-radius: 10px; font-size: 2rem; font-weight: bold; color: #e74c3c; margin-bottom: 20px; text-shadow: 0 0 10px #e74c3c; display: flex; flex-direction: column; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
+  .timer-label { font-size: 0.9rem; color: #D4AF37; text-shadow: none; margin-bottom: 5px; letter-spacing: 2px; }
+
+  .top-dashboard { display: flex; width: 100%; max-width: 850px; gap: 15px; margin-bottom: 15px; }
+  .dashboard-left { display: flex; flex-direction: column; flex: 2; gap: 15px; }
+  .dashboard-right { display: flex; flex: 1; }
+  .panel-base { background: rgba(20,20,20,0.8); padding: 15px; border-radius: 10px; border: 1px solid #D4AF37; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; box-sizing: border-box; }
+
+  .deck-panel { background: rgba(30,50,30,0.9); border-color: #2ECC71; flex-direction: column; width: 100%; flex: 1; justify-content: center; align-items: center; }
+  .deck-title { color: #FFD700; font-weight: bold; letter-spacing: 1px; font-size: 1.1rem; margin-bottom: 10px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+  .deck-options { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+  .deck-options label { cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: color 0.2s; }
+  .deck-options input[type="radio"] { accent-color: #2ECC71; cursor: pointer; }
+
+  .analytics-panel { flex-direction: column; justify-content: center; align-items: center; gap: 10px; border-color: #555; background: rgba(30,30,30,0.9); width: 100%; flex: 2; }
+  .history-container { display: flex; align-items: flex-end; justify-content: center; flex-wrap: wrap; gap: 5px; min-height: 45px; width: 100%; }
+  .ball-wrapper { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 5px; }
+  .recent-label { font-size: 0.65rem; color: #2ecc71; font-weight: bold; }
+  .history-ball { display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; border-radius: 50%; color: white; font-weight: bold; font-size: 0.85rem; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.5); text-shadow: 1px 1px 1px black; }
+  .history-ball.zero { background: radial-gradient(circle at 30% 30%, #2ecc71, #27ae60); }
+  .history-ball.red { background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b); }
+  .history-ball.black { background: radial-gradient(circle at 30% 30%, #555, #111); border: 1px solid #333; }
+  .stat-box { font-size: 1rem; width: 100%; text-align: center; } 
+  .stat-hot { color: #e74c3c; font-weight: bold; } .stat-cold { color: #3498db; font-weight: bold; }
+
+  .vault-panel { background: linear-gradient(145deg, #434343, #1c1c1c); border: 4px solid #5a6268; border-radius: 12px; box-shadow: inset 0px 0px 20px rgba(0,0,0,1), 5px 5px 15px rgba(0,0,0,0.8); flex-direction: column; gap: 8px; width: 100%; justify-content: center; position: relative; padding: 15px 20px; }
+  .vault-title { color: #bdc3c7; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #5a6268; padding-bottom: 5px; text-align: center; }
+  .vault-balance { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #2ecc71; font-size: 1.6rem; background: #0a0a0a; padding: 8px 15px; border-radius: 5px; border: 2px inset #222; text-align: center; text-shadow: 0 0 5px #2ecc71; }
+  .vault-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .vault-btn-group { display: flex; gap: 8px; width: 100%; }
+  .btn-vault { background: linear-gradient(to bottom, #7f8c8d, #34495e); color: white; border: 2px solid #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.85rem; flex: 1; }
+  .btn-vault:active:not(:disabled) { transform: translateY(2px); }
+  
+  .player-title-display { background: rgba(255,215,0,0.2); border: 1px solid #FFD700; color: #FFD700; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px; }
+
+  .game-container { display: flex; flex-direction: row; gap: 30px; background: #1e5631; padding: 30px; border-radius: 20px; box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.8); border: 8px solid #4a3b2c; align-items: center; margin-bottom: 15px; transition: background 0.5s; background-size: cover; background-position: center; }
+  .roulette-wrapper { position: relative; width: var(--wheel); height: var(--wheel); flex: none; border-radius: 50%; border: 10px solid #ccc; box-shadow: 0 0 20px rgba(0,0,0,0.8); background: #111; }
+  #rouletteCanvas { width: 100%; height: 100%; border-radius: 50%; }
+  
+  .board-wrapper { display: flex; flex-direction: column; width: fit-content; position: relative; }
+  .board-grid-wrapper { display: flex; }
+  .zero-area { display: flex; flex-direction: column; width: var(--cell); border-top: 1px solid #fff; border-left: 1px solid #fff; }
+  .board-grid { display: grid; grid-template-columns: repeat(12, var(--cell)) var(--cell); grid-template-rows: repeat(3, var(--cell)); border-top: 1px solid #fff; }
+  
+  .cell { display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: calc(var(--cell) * 0.36); border-right: 1px solid #fff; border-bottom: 1px solid #fff; cursor: pointer; position: relative; box-sizing: border-box; transition: filter 0.2s; } 
+  .cell:hover { filter: brightness(1.3); }
+  .zero-cell { background: #27ae60; flex: 1; } 
+  .red { background: #c0392b; } .black { background: #1a1a1a; } .col-bet { background: transparent; font-size: calc(var(--cell) * 0.28); }
+  
+  .outside-bets-1 { display: grid; grid-template-columns: var(--cell) repeat(3, calc(var(--cell) * 4)) var(--cell); margin-top: -1px; } .outside-bets-2 { display: grid; grid-template-columns: var(--cell) repeat(6, calc(var(--cell) * 2)) var(--cell); margin-top: -1px; }
+  .out-cell { height: calc(var(--cell) * 0.8); font-size: calc(var(--cell) * 0.3); display: flex; align-items: center; justify-content: center; border: 1px solid #fff; cursor: pointer; font-weight: bold; box-sizing: border-box; margin-left: -1px; margin-top: -1px; } .out-cell:hover { background: rgba(255,255,255,0.1); } .spacer { border: none; visibility: hidden; }
+
+  .system-panel { width: 100%; max-width: 850px; display: flex; justify-content: space-around; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px; }
+  .balance-group { display: flex; flex-direction: column; font-size: 1.2rem; align-items: center; border-right: 1px solid #555; padding-right: 20px; }
+  .balance { font-size: 1.5rem; font-weight: bold; color: #2ECC71; }
+  .btn-sys { background: #444; color: white; border: 1px solid #777; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+  .btn-sys:hover { background: #555; transform: translateY(-1px); } 
+  .btn-sys.undo { background: #e67e22; border-color: #d35400; } .btn-sys.double { background: #8e44ad; border-color: #9b59b6; } .btn-sys.recharge { background: #16a085; border-color: #1abc9c; }
+  
+  .controls { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; max-width: 850px; } 
+  .chip-selector { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; cursor: pointer; border: 3px dashed rgba(255,255,255,0.3); box-shadow: 2px 2px 5px rgba(0,0,0,0.5); transition: transform 0.2s; } 
+  .chip.active { transform: scale(1.15); border: 3px solid #FFD700; box-shadow: 0 0 15px #FFD700; z-index: 5; }
+  .chip-10 { background: #3498db; } .chip-25 { background: #2ecc71; } .chip-50 { background: #9b59b6; } .chip-100 { background: #1abc9c; } .chip-500 { background: #e67e22; } .chip-1000 { background: #e74c3c; } .chip-5000 { background: #f1c40f; color: black; } .chip-10000 { background: #bdc3c7; color: black; }
+  .chip-100k { background: #2c3e50; border-color: #7f8c8d; }
+  .chip-1m { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%); color: black; border-color: #e84393; }
+  .chip-10m { background: linear-gradient(135deg, #000 0%, #434343 100%); color: #FFD700; border: 3px solid #FFD700; box-shadow: inset 0 0 10px #FFD700; }
+  
+  .placed-chip { position: absolute; width: calc(var(--cell) * 0.64); height: calc(var(--cell) * 0.64); touch-action: none; border-radius: 50%; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="gold" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="30" fill="white" stroke="black" stroke-width="2"/></svg>') center/cover; display: flex; align-items: center; justify-content: center; color: black; font-size: calc(var(--cell) * 0.2); font-weight: bold; z-index: 100; text-shadow: 0 0 2px white; transform: translate(-50%, -50%); cursor: grab; }
+  .placed-chip:active { cursor: grabbing; }
+  
+  #message-box { margin-top: 5px; font-size: 1.2rem; min-height: 30px; color: #FFD700; font-weight: bold; text-align: center; max-width: 100%; }
+
+  /* VIP SHOP MODAL */
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; }
+  .shop-modal { background: #111; border: 5px solid #D4AF37; width: min(800px, calc(100vw - 20px)); max-height: 85vh; border-radius: 15px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px rgba(212, 175, 55, 0.4); }
+  .shop-header { background: linear-gradient(to right, #111, #333, #111); padding: 20px; text-align: center; border-bottom: 2px solid #D4AF37; position: relative; }
+  .shop-header h2 { margin: 0; color: #FFD700; font-size: 1.8rem; letter-spacing: 3px; }
+  .close-shop { position: absolute; right: 20px; top: 20px; background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+  .shop-nav { display: flex; background: #222; }
+  .shop-tab { flex: 1; padding: 15px 0; background: none; border: none; color: #888; font-weight: bold; cursor: pointer; font-size: 1rem; border-bottom: 3px solid transparent; transition: 0.3s; }
+  .shop-tab.active { color: #FFD700; border-bottom: 3px solid #FFD700; background: #333; }
+  .shop-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+  .shop-item { background: #222; border: 1px solid #444; border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+  .item-info { display: flex; flex-direction: column; }
+  .item-name { font-size: 1.2rem; font-weight: bold; color: white; margin-bottom: 5px; }
+  .item-price { color: #2ecc71; font-weight: bold; }
+  .btn-buy { background: #D4AF37; color: black; border: none; padding: 10px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+  .btn-buy:hover { background: #f1c40f; }
+  .btn-buy.owned { background: #34495e; color: white; }
+  .btn-buy.equipped { background: #2ecc71; color: black; cursor: default; }
+
+  #fxCanvas { position: fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; display:none; }
+
+  /* 휠 + 보드를 나란히 두면 1146px가 필요하다. 그보다 좁으면 위아래로 쌓는다. */
+  @media (max-width: 1180px) {
+    .game-container { flex-direction: column; gap: 20px; }
+  }
+
+  /* 폰 구간: --cell 계산식이 가정한 패딩 예산(20+16+6=42px)에 맞춘다. */
+  @media (max-width: 860px) {
+    body { padding: 10px; }
+    .game-container { padding: 8px; border-width: 3px; gap: 12px; }
+    .roulette-wrapper { border-width: 5px; }
+    .top-bar { justify-content: center; }
+    .table-selector { gap: 8px; flex: 1 1 100%; justify-content: center; }
+    .btn-table { padding: 8px 14px; font-size: 0.85rem; }
+    .btn-shop { padding: 8px 18px; font-size: 1rem; }
+    .top-dashboard { flex-direction: column; }
+    .timer-board { padding: 8px 24px; font-size: 1.6rem; margin-bottom: 12px; }
+    .system-panel { gap: 8px; }
+    .balance-group { border-right: none; padding-right: 0; }
+    .shop-header { padding: 14px; }
+    .shop-header h2 { font-size: 1.3rem; }
+    .shop-body { padding: 12px; }
+    .shop-tab { padding: 12px 0; font-size: 0.85rem; }
+  }
+
+  /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
+  @media (hover: none) {
+    .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover { transform: none; }
+    .btn-shop:hover { filter: none; }
+    .cell:hover { filter: none; }
+  }
+</style>
+</head>
+<body>
+
+  <input type="file" id="dealerImgUpload" style="display:none;" accept="image/*">
+
+  <canvas id="fxCanvas"></canvas>
+
+  <div class="top-bar">
+      <div class="table-selector">
+        <button class="btn-table active" id="tab-eu">European Table (Single 0)</button>
+        <button class="btn-table" id="tab-am">American Table (0 & 00)</button>
+      </div>
+      <button class="btn-shop" id="btnOpenShop">🛒 VIP SHOP</button>
+  </div>
+
+  <div class="dealer-section" title="이곳을 클릭하여 딜러 사진을 직접 등록하십시오.">
+      <div class="dealer-avatar" id="dealerImg">
+          <div class="dealer-placeholder" id="dealerPlaceholder">M</div>
+          <div class="camera-icon">📷</div>
+      </div>
+      <div class="dealer-name" id="dealerName">Virtual Dealer: MULBUM</div>
+  </div>
+  
+  <div class="timer-board">
+      <div class="timer-label">LIVE AUTO SPIN</div>
+      <div id="spinTimerText">00:30</div>
+  </div>
+  
+  <div class="top-dashboard">
+    <div class="dashboard-left">
+      <div class="panel-base deck-panel">
+        <div class="deck-title">⚙️ 덱 세팅 모드</div>
+        <div class="deck-options">
+            <label><input type="radio" name="betMode" value="1" checked> 1) 매 판 초기화</label>
+            <label><input type="radio" name="betMode" value="2"> 2) 항상 유지</label>
+            <label><input type="radio" name="betMode" value="3"> 3) 승리 시에만 유지</label>
+        </div>
+      </div>
+      <div class="panel-base analytics-panel">
+        <div class="history-container" id="historyDisplay">-</div>
+        <div class="stat-box">
+            <span class="stat-hot">🔥 HOT: <span id="hotDisplay">-</span></span> &nbsp;|&nbsp; <span class="stat-cold">❄️ COLD: <span id="coldDisplay">-</span></span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="dashboard-right">
+      <div class="panel-base vault-panel">
+        <div class="vault-title">VIP Vault</div>
+        <div class="vault-balance">$<span id="vaultDisplay">0</span></div>
+        <div class="vault-actions">
+          <div class="vault-btn-group">
+              <button class="btn-vault deposit" id="btnDeposit">입금</button>
+              <button class="btn-vault withdraw" id="btnWithdraw">출금</button>
+          </div>
+          <div class="vault-btn-group">
+              <button class="btn-vault" id="btnIssueVoucher" style="background:#8e44ad; border-color:#9b59b6;">수표 발행</button>
+              <button class="btn-vault" id="btnRedeemVoucher" style="background:#f39c12; border-color:#f1c40f;">수표 입금</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="game-container" id="gameContainer">
+    <div class="roulette-wrapper"><canvas id="rouletteCanvas" width="300" height="300"></canvas></div>
+    <div class="board-wrapper" id="boardWrapper">
+      <div class="board-grid-wrapper">
+          <div class="zero-area" id="zero-container"></div>
+          <div class="board-grid" id="main-grid"></div>
+      </div>
+      <div class="outside-bets-1"><div class="spacer" style="width:50px;"></div><div class="out-cell" data-bet="1st12">1st 12</div><div class="out-cell" data-bet="2nd12">2nd 12</div><div class="out-cell" data-bet="3rd12">3rd 12</div><div class="spacer" style="width:50px;"></div></div>
+      <div class="outside-bets-2"><div class="spacer" style="width:50px;"></div><div class="out-cell" data-bet="1-18">1 to 18</div><div class="out-cell" data-bet="even">EVEN</div><div class="out-cell red" data-bet="red" style="background:#c0392b;">RED</div><div class="out-cell black" data-bet="black" style="background:#1a1a1a;">BLACK</div><div class="out-cell" data-bet="odd">ODD</div><div class="out-cell" data-bet="19-36">19 to 36</div><div class="spacer" style="width:50px;"></div></div>
+    </div>
+  </div>
+
+  <div class="panel-base system-panel">
+    <div class="balance-group">
+        <div id="playerTitleDisplay" class="player-title-display" style="display:none;"></div>
+        <div>Balance: $<span id="balanceDisplay" class="balance">500</span></div>
+        <div style="font-size:1rem; color:#ccc;">Bet: $<span id="totalBetDisplay">0</span></div>
+    </div>
+    <button class="btn-sys undo" id="btnUndo">Undo</button>
+    <button class="btn-sys double" id="btnDouble">Double</button>
+    <button class="btn-sys" id="btnClear">Clear</button>
+    <button class="btn-sys recharge" id="btnRecharge">💰 $500 충전</button>
+  </div>
+  
+  <div class="controls">
+    <div class="chip-selector" id="chip-container">
+      <div class="chip chip-10 active" data-val="10">10</div>
+      <div class="chip chip-25" data-val="25">25</div>
+      <div class="chip chip-50" data-val="50">50</div>
+      <div class="chip chip-100" data-val="100">100</div>
+      <div class="chip chip-500" data-val="500">500</div>
+      <div class="chip chip-1000" data-val="1000">1K</div>
+      <div class="chip chip-5000" data-val="5000">5K</div>
+      <div class="chip chip-10000" data-val="10000">10K</div>
+      <div class="chip chip-100k" data-val="100000">100K</div>
+      <div class="chip chip-1m" data-val="1000000">1M</div>
+      <div class="chip chip-10m" data-val="10000000">10M</div>
+    </div>
+    <div id="message-box">불멸의 히스토리 시스템 가동 완료. 20개의 기록이 영구 보존됩니다.</div>
+  </div>
+
+  <div class="modal-overlay" id="shopModal">
+      <div class="shop-modal">
+          <div class="shop-header">
+              <h2>💎 VIP LOUNGE SHOP</h2>
+              <button class="close-shop" id="btnCloseShop">&times;</button>
+          </div>
+          <div class="shop-nav">
+              <button class="shop-tab active" data-tab="wheels">🎡 Wheels</button>
+              <button class="shop-tab" data-tab="felts">🟢 Felts</button>
+              <button class="shop-tab" data-tab="balls">🎱 Balls</button>
+              <button class="shop-tab" data-tab="titles">👑 Titles</button>
+              <button class="shop-tab" data-tab="effects">✨ Effects</button>
+          </div>
+          <div class="shop-body" id="shopBody"></div>
+      </div>
+  </div>
+
+<script>
+(function() {
+  let balance = 500; let vaultBalance = 0; 
+  let currentChip = 10; let placedBets = {}; let betHistory = []; let totalBetAmount = 0;
+  const RECHARGE_AMOUNT = 500;   // 파산 시 한 번에 충전되는 금액
+  let usedVouchers = JSON.parse(localStorage.getItem('casino_vip_used_vouchers')) || [];
+
+  try { 
+      const saved = localStorage.getItem('casino_vip_balance_uni'); if (saved !== null) balance = parseInt(saved); 
+      const vSaved = localStorage.getItem('casino_vip_vault_uni'); if (vSaved !== null) vaultBalance = parseInt(vSaved);
+  } catch (e) {}
+
+  function saveBalances() {
+      try { localStorage.setItem('casino_vip_balance_uni', balance); localStorage.setItem('casino_vip_vault_uni', vaultBalance); } catch(e) {}
+  }
+
+  let dealerImages = {
+      EU: localStorage.getItem('casino_vip_img_eu'),
+      AM: localStorage.getItem('casino_vip_img_am')
+  };
+  const dealerInitials = { EU: 'M', AM: 'P' };
+
+  const dealerImgEl = document.getElementById('dealerImg');
+  const dealerNameEl = document.getElementById('dealerName');
+  const uploadInput = document.getElementById('dealerImgUpload');
+  const dealerPlaceholderEl = document.getElementById('dealerPlaceholder');
+
+  function applyDealerImage(table) {
+      const src = dealerImages[table];
+      if (src) {
+          dealerImgEl.style.backgroundImage = `url('${src}')`;
+          dealerPlaceholderEl.style.display = 'none';
+      } else {
+          dealerImgEl.style.backgroundImage = 'none';
+          dealerPlaceholderEl.innerText = dealerInitials[table];
+          dealerPlaceholderEl.style.display = 'flex';
+      }
+  }
+
+  applyDealerImage('EU');
+  dealerImgEl.addEventListener('click', () => { uploadInput.click(); });
+  uploadInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const base64Str = event.target.result;
+          dealerImages[currentTable] = base64Str;
+          applyDealerImage(currentTable);
+          if(currentTable === 'EU') localStorage.setItem('casino_vip_img_eu', base64Str);
+          else localStorage.setItem('casino_vip_img_am', base64Str);
+          alert("✅ 딜러 프로필이 브라우저에 성공적으로 영구 등록되었습니다.");
+      };
+      reader.readAsDataURL(file);
+  });
+
+  let historyEU = JSON.parse(localStorage.getItem('casino_vip_hist_eu')) || [];
+  let freqEU = JSON.parse(localStorage.getItem('casino_vip_freq_eu')) || {};
+  if (Object.keys(freqEU).length === 0) for(let i=0; i<=36; i++) freqEU[i] = 0;
+
+  let historyAM = JSON.parse(localStorage.getItem('casino_vip_hist_am')) || [];
+  let freqAM = JSON.parse(localStorage.getItem('casino_vip_freq_am')) || {};
+  if (Object.keys(freqAM).length === 0) { for(let i=0; i<=36; i++) freqAM[i] = 0; freqAM['00'] = 0; }
+
+  function saveHistory() {
+      localStorage.setItem('casino_vip_hist_eu', JSON.stringify(historyEU));
+      localStorage.setItem('casino_vip_freq_eu', JSON.stringify(freqEU));
+      localStorage.setItem('casino_vip_hist_am', JSON.stringify(historyAM));
+      localStorage.setItem('casino_vip_freq_am', JSON.stringify(freqAM));
+  }
+
+  const shopData = {
+      wheels: [
+          {id:"w1", name:"Classic Mahogany", price:0},
+          {id:"w2", name:"24K Pure Gold", price:10000},
+          {id:"w3", name:"Neon Cyberpunk", price:25000},
+          {id:"w4", name:"Blood Moon", price:50000},
+          {id:"w5", name:"Diamond Frost", price:100000},
+          {id:"w6", name:"Galactic Supernova", price:5000000}
+      ],
+      felts: [
+          {id:"f1", name:"Original Green", price:0},
+          {id:"f2", name:"Royal Red", price:2000},
+          {id:"f3", name:"Midnight Blue", price:5000},
+          {id:"f4", name:"Black Velvet", price:15000},
+          {id:"f5", name:"Milky Way Galaxy", price:50000},
+          {id:"f6", name:"Quantum Void", price:5000000}
+      ],
+      balls: [
+          {id:"b1", name:"Classic Ivory", price:0},
+          {id:"b2", name:"Obsidian Ball", price:5000},
+          {id:"b3", name:"Blood Ruby", price:15000},
+          {id:"b4", name:"Glow Neon", price:30000},
+          {id:"b5", name:"Solid Gold Ball", price:100000},
+          {id:"b6", name:"Anti-Matter Orb", price:5000000}
+      ],
+      titles: [
+          {id:"t1", name:"Guest", price:0},
+          {id:"t2", name:"Lucky Gambler", price:10000},
+          {id:"t3", name:"High Roller", price:50000},
+          {id:"t4", name:"The Whale", price:200000},
+          {id:"t5", name:"CASINO OWNER", price:1000000},
+          {id:"t6", name:"GOD OF GAMBLERS", price:50000000}
+      ],
+      effects: [
+          {id:"e1", name:"None (Classic)", price:0},
+          {id:"e2", name:"Electric Flash", price:30000},
+          {id:"e3", name:"Golden Rain", price:80000},
+          {id:"e4", name:"Jackpot Fireworks", price:200000},
+          {id:"e5", name:"Meteor Strike", price:10000000}
+      ]
+  };
+
+  let inventory = JSON.parse(localStorage.getItem('casino_vip_inventory')) || ["w1","f1","b1","t1","e1"];
+  let equipped = JSON.parse(localStorage.getItem('casino_vip_equipped')) || { wheels:"w1", felts:"f1", balls:"b1", titles:"t1", effects:"e1" };
+
+  function saveShop() {
+      localStorage.setItem('casino_vip_inventory', JSON.stringify(inventory));
+      localStorage.setItem('casino_vip_equipped', JSON.stringify(equipped));
+  }
+
+  const shopModal = document.getElementById('shopModal');
+  const shopBody = document.getElementById('shopBody');
+  let currentShopTab = 'wheels';
+
+  document.getElementById('btnOpenShop').addEventListener('click', () => { shopModal.style.display = 'flex'; renderShop(); });
+  document.getElementById('btnCloseShop').addEventListener('click', () => { shopModal.style.display = 'none'; });
+  
+  document.querySelectorAll('.shop-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+          document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+          e.target.classList.add('active');
+          currentShopTab = e.target.dataset.tab;
+          renderShop();
+      });
+  });
+
+  function renderShop() {
+      shopBody.innerHTML = '';
+      let items = shopData[currentShopTab];
+      items.forEach(item => {
+          let isOwned = inventory.includes(item.id);
+          let isEquipped = equipped[currentShopTab] === item.id;
+          
+          let btnHtml = '';
+          if(isEquipped) {
+              btnHtml = `<button class="btn-buy equipped">Equipped</button>`;
+          } else if(isOwned) {
+              btnHtml = `<button class="btn-buy owned" onclick="equipItem('${currentShopTab}', '${item.id}')">Equip</button>`;
+          } else {
+              btnHtml = `<button class="btn-buy" onclick="buyItem('${item.id}', ${item.price}, '${currentShopTab}')">Buy ($${item.price.toLocaleString()})</button>`;
+          }
+
+          let div = document.createElement('div');
+          div.className = 'shop-item';
+          div.innerHTML = `
+              <div class="item-info">
+                  <div class="item-name">${item.name}</div>
+                  <div class="item-price">${isOwned ? 'Owned' : '$' + item.price.toLocaleString()}</div>
+              </div>
+              ${btnHtml}
+          `;
+          shopBody.appendChild(div);
+      });
+  }
+
+  window.buyItem = function(id, price, category) {
+      if(balance < price) { alert("🚨 잔고가 부족합니다!"); return; }
+      if(confirm(`$${price.toLocaleString()} 을 지불하고 구매하시겠습니까?`)) {
+          balance -= price; inventory.push(id); saveBalances(); saveShop(); updateUI(); renderShop();
+      }
+  }
+  
+  window.equipItem = function(category, id) {
+      equipped[category] = id; saveShop(); renderShop(); applyEquippedSkins(); drawWheelStatic();
+  }
+
+  function applyEquippedSkins() {
+      let cont = document.getElementById('gameContainer');
+      let f = equipped.felts;
+      cont.style.backgroundImage = 'none';
+      if(f==='f1') cont.style.background = '#1e5631';
+      else if(f==='f2') cont.style.background = '#7a0016';
+      else if(f==='f3') cont.style.background = '#191970';
+      else if(f==='f4') cont.style.background = '#0a0a0a';
+      else if(f==='f5') cont.style.backgroundImage = 'radial-gradient(circle at center, #2b1055 0%, #000000 100%)';
+      else if(f==='f6') cont.style.backgroundImage = 'radial-gradient(circle at center, #05001f 0%, #000000 100%)';
+
+      let tId = equipped.titles;
+      let titleDiv = document.getElementById('playerTitleDisplay');
+      if(tId === 't1') titleDiv.style.display = 'none';
+      else {
+          titleDiv.style.display = 'block';
+          let tName = shopData.titles.find(x=>x.id===tId).name;
+          titleDiv.innerText = `👑 ${tName}`;
+      }
+  }
+
+  let currentTable = 'EU'; 
+  const redNumbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+  const wheelNumEU = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+  const wheelNumAM = ['00',27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2,0,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1];
+
+  let isSpinning = false; let isRoundOver = false; let needToPayForKeptBets = false;
+  let betTimeLeft = 30; let autoTimer = null;
+  const msgBox = document.getElementById('message-box'); const balDisplay = document.getElementById('balanceDisplay');
+  const timerDisp = document.getElementById('spinTimerText');
+
+  document.getElementById('tab-eu').addEventListener('click', () => switchTable('EU'));
+  document.getElementById('tab-am').addEventListener('click', () => switchTable('AM'));
+
+  function switchTable(mode) {
+      if (isSpinning) { msgBox.innerText = "스핀 중에는 이동 불가합니다."; return; }
+      if (currentTable === mode) return; 
+      if (totalBetAmount > 0 && !confirm("모든 칩을 회수하고 넘어갈까요?")) return; 
+      currentTable = mode;
+      document.getElementById('tab-eu').classList.toggle('active', mode === 'EU');
+      document.getElementById('tab-am').classList.toggle('active', mode === 'AM');
+      
+      applyDealerImage(mode);
+      dealerNameEl.innerText = (mode === 'EU') ? "Virtual Dealer: MULBUM" : "Virtual Dealer: PENGUIN";
+      
+      clearAllBets(); buildBoard(); updateAnalyticsBoard(); drawWheelStatic();
+  }
+
+  function buildBoard() {
+      const mainGrid = document.getElementById('main-grid'); const zeroContainer = document.getElementById('zero-container');
+      mainGrid.innerHTML = ''; zeroContainer.innerHTML = '';
+      if (currentTable === 'EU') {
+          let div = document.createElement('div'); div.className = 'cell zero-cell'; div.innerText = '0';
+          div.addEventListener('click', (e) => handleInsideBet(e, 0, true, null, null)); zeroContainer.appendChild(div);
+      } else {
+          let div0 = document.createElement('div'); div0.className = 'cell zero-cell'; div0.innerText = '0';
+          let div00 = document.createElement('div'); div00.className = 'cell zero-cell'; div00.innerText = '00';
+          div0.addEventListener('click', (e) => handleInsideBet(e, 0, true, null, null));
+          div00.addEventListener('click', (e) => handleInsideBet(e, '00', true, null, null));
+          zeroContainer.appendChild(div0); zeroContainer.appendChild(div00);
+      }
+      const numbersLayout = [ 3,6,9,12,15,18,21,24,27,30,33,36, 2,5,8,11,14,17,20,23,26,29,32,35, 1,4,7,10,13,16,19,22,25,28,31,34 ];
+      numbersLayout.forEach((num, index) => {
+          let div = document.createElement('div'); div.className = `cell ${redNumbers.includes(num) ? 'red' : 'black'}`; div.innerText = num;
+          let row = Math.floor(index / 12) + 1; let col = (index % 12) + 1; div.style.gridArea = `${row} / ${col} / ${row + 1} / ${col + 1}`;
+          div.addEventListener('click', (e) => handleInsideBet(e, num, false, row, col)); mainGrid.appendChild(div);
+      });
+      for(let i=1; i<=3; i++) {
+          let div = document.createElement('div'); div.className = 'cell col-bet'; div.innerText = '2to1'; div.dataset.bet = `col${4-i}`; div.style.gridArea = `${i} / 13 / ${i+1} / 14`;
+          div.addEventListener('click', (e) => handleOutsideBet(e, div.dataset.bet)); mainGrid.appendChild(div);
+      }
+  }
+
+  function handleInsideBet(e, num, isZeroArea, row, col) {
+      if (isSpinning) return; handleKeptBets();
+      if (currentChip > balance) { msgBox.innerText = "잔고가 부족합니다."; return; }
+      let targets = []; let chipX, chipY;
+      const boardRect = document.getElementById('boardWrapper').getBoundingClientRect();
+      
+      if (isZeroArea) {
+          targets = [num]; const rect = e.target.getBoundingClientRect();
+          chipX = rect.left - boardRect.left + rect.width/2; 
+          chipY = rect.top - boardRect.top + rect.height/2;
+          if (currentTable === 'AM') {
+              const y = e.offsetY; const h = e.target.clientHeight;
+              if (num === 0 && y < 18) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
+              else if (num === '00' && y > h - 18) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
+          }
+      } else {
+          const x = e.offsetX; const y = e.offsetY; const w = e.target.clientWidth; const h = e.target.clientHeight; const rect = e.target.getBoundingClientRect();
+          const c = Math.ceil(num / 3); const r = row; 
+          let isUp = y < 18; let isDown = y > h - 18; let isLeft = x < 18; let isRight = x > w - 18;
+          
+          chipX = rect.left - boardRect.left + w / 2; 
+          chipY = rect.top - boardRect.top + h / 2;
+          
+          if (isLeft && c === 1) { 
+              if (currentTable === 'EU') {
+                  if ((r === 2 && isUp) || (r === 1 && isDown)) targets = [0, 2, 3];
+                  else if ((r === 2 && isDown) || (r === 3 && isUp)) targets = [0, 1, 2];
+                  else if (r === 2 && !isUp && !isDown) targets = [0, 1, 2, 3]; else targets = [0, num];
+              } else { 
+                  if (r === 1) targets = ['00', 3]; else if (r === 3) targets = [0, 1];
+                  else if (r === 2 && isUp) targets = ['00', 2, 3]; else if (r === 2 && isDown) targets = [0, 1, 2];
+                  else if (r === 2) targets = [0, '00', 1, 2, 3]; else targets = [num];
+              }
+          } else if ((isUp && r === 1) || (isDown && r === 3)) { 
+              if (isLeft && c > 1) targets = [(c-1)*3, (c-1)*3-1, (c-1)*3-2, c*3, c*3-1, c*3-2];
+              else if (isRight && c < 12) targets = [c*3, c*3-1, c*3-2, (c+1)*3, (c+1)*3-1, (c+1)*3-2]; else targets = [c*3, c*3-1, c*3-2];
+          } else { 
+              let cols = []; if (isLeft && c > 1) cols.push(c - 1); cols.push(c); if (isRight && c < 12) cols.push(c + 1);
+              let rows = []; if (isUp && r > 1) rows.push(r - 1); rows.push(r); if (isDown && r < 3) rows.push(r + 1);
+              for (let cc of cols) { for (let rr of rows) targets.push(cc * 3 - (rr - 1)); }
+          }
+          if (isLeft) chipX = rect.left - boardRect.left; if (isRight) chipX = rect.right - boardRect.left;
+          if (isUp) chipY = rect.top - boardRect.top; if (isDown) chipY = rect.bottom - boardRect.top;
+      }
+      targets.sort((a, b) => { if(a==='00') return -1; if(b==='00') return 1; return a-b; });
+      placeBet(targets.join(','), currentChip, targets, chipX, chipY, true);
+  }
+
+  function handleOutsideBet(e, betName) {
+      if (isSpinning) return; handleKeptBets();
+      if (currentChip > balance) { msgBox.innerText = "잔고가 부족합니다."; return; }
+      const boardRect = document.getElementById('boardWrapper').getBoundingClientRect();
+      const rect = e.target.getBoundingClientRect(); 
+      placeBet(betName, currentChip, [betName], rect.left - boardRect.left + rect.width / 2, rect.top - boardRect.top + rect.height / 2, true);
+  }
+  document.querySelectorAll('.out-cell').forEach(el => { el.addEventListener('click', (e) => handleOutsideBet(e, el.dataset.bet)); });
+
+  function formatChip(amount) {
+      if(amount >= 1000000) return (amount/1000000) + 'M';
+      if(amount >= 1000) return (amount/1000) + 'K';
+      return amount;
+  }
+
+  function placeBet(spotKey, amount, targets, relX, relY, recordHistory) {
+      balance -= amount; totalBetAmount += amount;
+      if (!placedBets[spotKey]) {
+          let marker = document.createElement('div'); marker.className = 'placed-chip'; 
+          marker.style.left = `${relX}px`; marker.style.top = `${relY}px`; 
+          document.getElementById('boardWrapper').appendChild(marker);
+          placedBets[spotKey] = { amount: 0, targets: targets, element: marker };
+          makeChipDraggable(marker, spotKey);
+      }
+      placedBets[spotKey].amount += amount;
+      if (recordHistory) betHistory.push({ spotKey, amount, targets, chipX: relX, chipY: relY });
+      placedBets[spotKey].element.innerText = formatChip(placedBets[spotKey].amount);
+      updateUI();
+  }
+
+  function makeChipDraggable(marker, originalSpotKey) {
+      // Pointer Events 를 쓰면 마우스·터치·펜이 같은 경로로 들어온다.
+      // 터치를 받으려면 .placed-chip 에 touch-action: none 이 걸려 있어야 한다.
+      marker.addEventListener('pointerdown', function(e) {
+          if (isSpinning) return;
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          e.preventDefault();
+          handleKeptBets();
+          let startX = e.clientX; let startY = e.clientY;
+          let initialLeft = parseFloat(marker.style.left); let initialTop = parseFloat(marker.style.top);
+          marker.style.zIndex = 1000;
+          // 손가락이 칩 밖으로 나가도 이벤트가 계속 칩으로 오게 한다.
+          try { marker.setPointerCapture(e.pointerId); } catch (err) {}
+
+          function cleanup() {
+              marker.removeEventListener('pointermove', onPointerMove);
+              marker.removeEventListener('pointerup', onPointerUp);
+              marker.removeEventListener('pointercancel', onPointerCancel);
+          }
+          function onPointerMove(moveEvent) {
+              if (moveEvent.pointerId !== e.pointerId) return;
+              marker.style.left = `${initialLeft + (moveEvent.clientX - startX)}px`;
+              marker.style.top = `${initialTop + (moveEvent.clientY - startY)}px`;
+          }
+          // 전화가 오거나 제스처가 가로채이면 원래 자리로 되돌린다.
+          function onPointerCancel(cancelEvent) {
+              if (cancelEvent.pointerId !== e.pointerId) return;
+              cleanup();
+              marker.style.zIndex = 100;
+              marker.style.left = `${initialLeft}px`; marker.style.top = `${initialTop}px`;
+          }
+          function onPointerUp(upEvent) {
+              if (upEvent.pointerId !== e.pointerId) return;
+              cleanup();
+              marker.style.zIndex = 100; marker.style.display = 'none';
+              let dropEl = document.elementFromPoint(upEvent.clientX, upEvent.clientY); marker.style.display = 'flex';
+              let cellEl = dropEl ? dropEl.closest('.cell, .out-cell') : null;
+              
+              if (cellEl && !isSpinning) {
+                  let betAmountToMove = placedBets[originalSpotKey].amount; balance += betAmountToMove; totalBetAmount -= betAmountToMove;
+                  marker.remove(); delete placedBets[originalSpotKey];
+                  let rect = cellEl.getBoundingClientRect(); let offsetX = upEvent.clientX - rect.left; let offsetY = upEvent.clientY - rect.top;
+                  let oldCurrentChip = currentChip; currentChip = betAmountToMove;
+                  if (cellEl.classList.contains('out-cell') || cellEl.classList.contains('col-bet')) {
+                      let betName = cellEl.dataset.bet; const boardRect = document.getElementById('boardWrapper').getBoundingClientRect();
+                      placeBet(betName, currentChip, [betName], rect.left - boardRect.left + rect.width / 2, rect.top - boardRect.top + rect.height / 2, true);
+                  } else {
+                      let num = cellEl.innerText === '00' ? '00' : parseInt(cellEl.innerText);
+                      let isZeroArea = cellEl.parentElement.id === 'zero-container';
+                      let row = null, col = null;
+                      if (!isZeroArea) { row = parseInt(cellEl.style.gridRowStart); col = parseInt(cellEl.style.gridColumnStart); }
+                      executeInsideBetFromDrop(cellEl, num, isZeroArea, row, col, offsetX, offsetY);
+                  }
+                  currentChip = oldCurrentChip; msgBox.innerText = "💸 배팅 칩의 이동이 완료되었습니다.";
+              } else { marker.style.left = `${initialLeft}px`; marker.style.top = `${initialTop}px`; }
+          }
+          marker.addEventListener('pointermove', onPointerMove);
+          marker.addEventListener('pointerup', onPointerUp);
+          marker.addEventListener('pointercancel', onPointerCancel);
+      });
+  }
+
+  function executeInsideBetFromDrop(targetEl, num, isZeroArea, row, col, offsetX, offsetY) {
+      let targets = []; let chipX, chipY;
+      let w = targetEl.clientWidth; let h = targetEl.clientHeight; const rect = targetEl.getBoundingClientRect();
+      const boardRect = document.getElementById('boardWrapper').getBoundingClientRect();
+
+      if (isZeroArea) {
+          targets = [num];
+          chipX = rect.left - boardRect.left + rect.width/2; chipY = rect.top - boardRect.top + rect.height/2;
+          if (currentTable === 'AM') {
+              if (num === 0 && offsetY < 18) { targets = [0, '00']; chipY = rect.top - boardRect.top; }
+              else if (num === '00' && offsetY > h - 18) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
+          }
+      } else {
+          let isUp = offsetY < 18; let isDown = offsetY > h - 18; let isLeft = offsetX < 18; let isRight = offsetX > w - 18;
+          chipX = rect.left - boardRect.left + w / 2; chipY = rect.top - boardRect.top + h / 2;
+          const c = Math.ceil(num / 3); const r = row;
+          if (isLeft && c === 1) { 
+              if (currentTable === 'EU') {
+                  if ((r === 2 && isUp) || (r === 1 && isDown)) targets = [0, 2, 3]; else if ((r === 2 && isDown) || (r === 3 && isUp)) targets = [0, 1, 2];
+                  else if (r === 2 && !isUp && !isDown) targets = [0, 1, 2, 3]; else targets = [0, num];
+              } else { 
+                  if (r === 1) targets = ['00', 3]; else if (r === 3) targets = [0, 1]; else if (r === 2 && isUp) targets = ['00', 2, 3]; else if (r === 2 && isDown) targets = [0, 1, 2];
+                  else if (r === 2) targets = [0, '00', 1, 2, 3]; else targets = [num];
+              }
+          } else if ((isUp && r === 1) || (isDown && r === 3)) { 
+              if (isLeft && c > 1) targets = [(c-1)*3, (c-1)*3-1, (c-1)*3-2, c*3, c*3-1, c*3-2];
+              else if (isRight && c < 12) targets = [c*3, c*3-1, c*3-2, (c+1)*3, (c+1)*3-1, (c+1)*3-2]; else targets = [c*3, c*3-1, c*3-2];
+          } else { 
+              let cols = []; if (isLeft && c > 1) cols.push(c - 1); cols.push(c); if (isRight && c < 12) cols.push(c + 1);
+              let rows = []; if (isUp && r > 1) rows.push(r - 1); rows.push(r); if (isDown && r < 3) rows.push(r + 1);
+              for (let cc of cols) { for (let rr of rows) targets.push(cc * 3 - (rr - 1)); }
+          }
+          if (isLeft) chipX = rect.left - boardRect.left; if (isRight) chipX = rect.right - boardRect.left;
+          if (isUp) chipY = rect.top - boardRect.top; if (isDown) chipY = rect.bottom - boardRect.top;
+      }
+      targets.sort((a, b) => { if(a==='00') return -1; if(b==='00') return 1; return a-b; });
+      placeBet(targets.join(','), currentChip, targets, chipX, chipY, true);
+  }
+
+  function handleKeptBets() {
+      if (isRoundOver && needToPayForKeptBets) {
+          if (balance < totalBetAmount) { resetBoardState(); msgBox.innerText = "잔고 부족으로 세팅이 해제되었습니다."; return; }
+          balance -= totalBetAmount; needToPayForKeptBets = false; isRoundOver = false; updateUI();
+      } else if (isRoundOver) { resetBoardState(); }
+  }
+
+  function clearAllBets() {
+      for (let k in placedBets) placedBets[k].element.remove();
+      balance += totalBetAmount; placedBets = {}; totalBetAmount = 0; betHistory = []; updateUI();
+  }
+  function resetBoardState() {
+      for (let k in placedBets) placedBets[k].element.remove();
+      placedBets = {}; totalBetAmount = 0; betHistory = []; isRoundOver = false; needToPayForKeptBets = false; updateUI();
+  }
+
+  document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          e.target.classList.add('active'); currentChip = parseInt(e.target.dataset.val);
+      });
+  });
+
+  document.getElementById('btnClear').addEventListener('click', () => { 
+      if(isSpinning) return; 
+      if(isRoundOver) { resetBoardState(); msgBox.innerText = "결과 정산 판은 환불되지 않습니다. 보드판만 청소 완료."; return; } 
+      clearAllBets(); 
+  });
+  
+  document.getElementById('btnUndo').addEventListener('click', () => {
+      if (isSpinning || betHistory.length === 0 || isRoundOver) return;
+      const last = betHistory.pop(); balance += last.amount; totalBetAmount -= last.amount;
+      const betSpot = placedBets[last.spotKey]; betSpot.amount -= last.amount;
+      if (betSpot.amount <= 0) { betSpot.element.remove(); delete placedBets[last.spotKey]; } 
+      else { betSpot.element.innerText = formatChip(betSpot.amount); }
+      updateUI();
+  });
+  
+  document.getElementById('btnDouble').addEventListener('click', () => {
+      if (isSpinning) return; handleKeptBets();
+      if (totalBetAmount === 0 || balance < totalBetAmount) return;
+      Object.values(placedBets).map(b => ({...b})).forEach(bet => placeBet(bet.targets.join(','), bet.amount, bet.targets, parseFloat(bet.element.style.left), parseFloat(bet.element.style.top), true));
+  });
+
+  function startAutoTimer() {
+      if(autoTimer) clearInterval(autoTimer);
+      betTimeLeft = 30; timerDisp.innerText = `00:30`;
+      autoTimer = setInterval(() => {
+          if (isSpinning) return; 
+          betTimeLeft--; timerDisp.innerText = `00:${betTimeLeft.toString().padStart(2, '0')}`;
+          if (betTimeLeft <= 0) { clearInterval(autoTimer); autoSpinTrigger(); }
+      }, 1000);
+  }
+
+  // 💡 수정됨: 베팅 금액이 0원이어도 스핀 진행
+  function autoSpinTrigger() {
+      handleKeptBets();
+      startSpinning();
+  }
+
+  const canvas = document.getElementById('rouletteCanvas'); const ctx = canvas.getContext('2d');
+  let startAngle = 0; let ballAngle = 0; let ballRadius = 180;
+  
+  function drawWheelStatic() { drawWheel(startAngle, ballAngle, ballRadius); }
+  
+  function drawWheel(angleOffset, bAngle, bRad) {
+      ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(150, 150);
+      let wheels = currentTable === 'EU' ? wheelNumEU : wheelNumAM; let arc = Math.PI / (wheels.length / 2);
+
+      let eqW = equipped.wheels;
+      let bCol = "#3e2b1c", rCol = "#8e6c4e", pR = "#c0392b", pB = "#111", pZ = "#27ae60", nCol = "white";
+      if(eqW==='w2') { bCol="#b8860b"; rCol="#ffd700"; }
+      if(eqW==='w3') { bCol="#001f3f"; rCol="#00ffff"; pR="#ff00ff"; pB="#000"; nCol="#0ff"; pZ="#00ff00"; }
+      if(eqW==='w4') { bCol="#2b0000"; rCol="#590000"; pR="#8a0303"; pB="#000"; pZ="#4a0000"; }
+      if(eqW==='w5') { bCol="#dcf0f7"; rCol="#ffffff"; pR="#e6f2ff"; pB="#cce6ff"; nCol="#000"; pZ="#a4e4d5"; }
+      if(eqW==='w6') { bCol="#110022"; rCol="#330066"; pR="#ff007f"; pB="#000"; nCol="#fff"; pZ="#00ffff"; }
+
+      ctx.beginPath(); ctx.arc(0,0,150, 0, 2*Math.PI); ctx.fillStyle = bCol; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,145, 0, 2*Math.PI, false); ctx.arc(0,0,125, 0, 2*Math.PI, true); ctx.fillStyle = rCol; ctx.fill();
+
+      for(let i=0; i<wheels.length; i++) {
+          let angle = angleOffset + i * arc; let num = wheels[i];
+          ctx.beginPath(); ctx.arc(0,0,120, angle, angle+arc, false); ctx.arc(0,0,90, angle+arc, angle, true);
+          ctx.fillStyle = (num === 0 || num === '00') ? pZ : (redNumbers.includes(Number(num)) ? pR : pB);
+          ctx.fill(); ctx.stroke(); ctx.save(); ctx.fillStyle = nCol;
+          ctx.translate(Math.cos(angle + arc/2)*105, Math.sin(angle + arc/2)*105);
+          ctx.rotate(angle + arc/2 + Math.PI/2); ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.fillText(num, 0, 0); ctx.restore();
+      }
+      
+      if (isSpinning || bRad < 130) {
+          let eqB = equipped.balls;
+          let ballF = "#FFF"; ctx.shadowBlur = 0;
+          if(eqB==='b2') ballF = "#222";
+          if(eqB==='b3') ballF = "#e74c3c";
+          if(eqB==='b4') { ballF = "#0f0"; ctx.shadowColor="#0f0"; ctx.shadowBlur=10; }
+          if(eqB==='b5') ballF = "#ffd700";
+          if(eqB==='b6') { ballF = "#fff"; ctx.shadowColor="#ff00ff"; ctx.shadowBlur=15; }
+
+          ctx.beginPath(); let bx = Math.cos(bAngle) * bRad; let by = Math.sin(bAngle) * bRad;
+          ctx.arc(bx, by, 6, 0, 2 * Math.PI); ctx.fillStyle = ballF; ctx.fill(); ctx.shadowBlur = 0;
+      }
+      ctx.translate(-150, -150);
+  }
+
+  // 💡 수정됨: 스핀 시작 시 관전 모드 메시지 분기
+  function startSpinning() {
+      isSpinning = true; timerDisp.innerText = "SPIN!";
+      if (totalBetAmount === 0) {
+          msgBox.innerText = "관전 모드입니다. 구슬이 굴러갑니다...";
+      } else {
+          msgBox.innerText = "No more bets! 구슬이 굴러갑니다...";
+      }
+      
+      let wheels = currentTable === 'EU' ? wheelNumEU : wheelNumAM; let arc = Math.PI / (wheels.length / 2);
+      let resultIndex = Math.floor(Math.random() * wheels.length); let targetNumber = wheels[resultIndex];
+      let spinTimeTotal = 8000 + Math.random() * 3000; let startTime = Date.now();
+      let initialStartAngle = startAngle % (Math.PI * 2); let initialBallAngle = ballAngle % (Math.PI * 2);
+      let finalStartAngle = initialStartAngle + (Math.PI * 10); let targetPocketAngle = finalStartAngle + resultIndex * arc + arc / 2;
+      let finalBallAngle = targetPocketAngle - (Math.PI * 16); 
+
+      function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+      function rotate() {
+          if (!isSpinning) return;
+          let elapsed = Date.now() - startTime;
+          if (elapsed >= spinTimeTotal) {
+              startAngle = finalStartAngle % (Math.PI * 2); ballAngle = finalBallAngle % (Math.PI * 2); ballRadius = 105;
+              drawWheel(startAngle, ballAngle, ballRadius); finishSpin(targetNumber); return;
+          }
+          let progress = elapsed / spinTimeTotal; let ease = easeOutCubic(progress);
+          startAngle = initialStartAngle + (finalStartAngle - initialStartAngle) * ease;
+          ballAngle = initialBallAngle + (finalBallAngle - initialBallAngle) * ease;
+          ballRadius = progress > 0.8 ? 135 - ((progress - 0.8) / 0.2) * 30 : 135;
+          drawWheel(startAngle, ballAngle, ballRadius); requestAnimationFrame(rotate);
+      }
+      rotate();
+  }
+
+  function finishSpin(winNum) { isSpinning = false; calculatePayout(winNum); startAutoTimer(); }
+
+  function triggerSpecialEffect() {
+      let ef = equipped.effects;
+      if(ef === 'e2') {
+          document.body.style.transition = "background-color 0.1s"; document.body.style.backgroundColor = "white";
+          setTimeout(()=> { document.body.style.backgroundColor = "#1a1a1a"; }, 150);
+      } else if (ef === 'e3') { showParticles("gold"); } else if (ef === 'e4') { showParticles("fireworks"); } else if (ef === 'e5') { showParticles("meteor"); }
+  }
+
+  function showParticles(type) {
+      const fx = document.getElementById('fxCanvas'); fx.style.display = 'block'; const fCtx = fx.getContext('2d');
+      fx.width = window.innerWidth; fx.height = window.innerHeight; let particles = [];
+      for(let i=0; i<100; i++) {
+          let px = type==='gold' ? Math.random()*fx.width : (type==='meteor' ? Math.random()*fx.width : fx.width/2);
+          let py = type==='gold' ? -20 : (type==='meteor' ? -Math.random()*200 : fx.height/2);
+          let pvx = type==='meteor' ? (Math.random()*5+5) : (Math.random()-0.5)*15;
+          let pvy = type==='gold' ? Math.random()*5+5 : (type==='meteor' ? Math.random()*10+10 : (Math.random()-0.5)*15);
+          let pc = type==='gold' ? '#FFD700' : (type==='meteor' ? ['#ff007f','#ff00ff','#ffffff'][Math.floor(Math.random()*3)] : ['#e74c3c','#3498db','#2ecc71','#f1c40f'][Math.floor(Math.random()*4)]);
+          particles.push({ x: px, y: py, vx: pvx, vy: pvy, c: pc });
+      }
+      let t = 0;
+      let anim = setInterval(()=>{
+          fCtx.clearRect(0,0,fx.width,fx.height);
+          particles.forEach(p=>{
+              p.x += p.vx; p.y += p.vy; 
+              if(type==='fireworks') p.vy+=0.5; if(type==='meteor') p.vy+=0.3;
+              fCtx.fillStyle = p.c; fCtx.beginPath(); fCtx.arc(p.x, p.y, type==='meteor'? 5 : 4, 0, Math.PI*2); fCtx.fill();
+          });
+          t++; if(t>60) { clearInterval(anim); fx.style.display='none'; }
+      }, 30);
+  }
+
+  // 💡 수정됨: 스핀 결과 처리 시 관전 모드 메시지 분기
+  function calculatePayout(winNum) {
+      let winnings = 0;
+      for (let key in placedBets) {
+          let amt = placedBets[key].amount; let ratio = 0; let targets = placedBets[key].targets;
+          let isNumberBet = targets.every(t => !isNaN(t) || t === '00');
+          if (isNumberBet) {
+              if (targets.map(String).includes(String(winNum))) { ratio = 36 / targets.length; if (targets.length === 5) ratio = 7; }
+          } else {
+              let w = Number(winNum);
+              if (winNum !== 0 && winNum !== '00') {
+                  if (key === 'red' && redNumbers.includes(w)) ratio = 2; else if (key === 'black' && !redNumbers.includes(w)) ratio = 2;
+                  else if (key === 'even' && w % 2 === 0) ratio = 2; else if (key === 'odd' && w % 2 !== 0) ratio = 2;
+                  else if (key === '1-18' && w <= 18) ratio = 2; else if (key === '19-36' && w >= 19) ratio = 2;
+                  else if (key === '1st12' && w <= 12) ratio = 3; else if (key === '2nd12' && w >= 13 && w <= 24) ratio = 3;
+                  else if (key === '3rd12' && w >= 25) ratio = 3; else if (key === 'col3' && w % 3 === 0) ratio = 3;
+                  else if (key === 'col2' && w % 3 === 2) ratio = 3; else if (key === 'col1' && w % 3 === 1) ratio = 3;
+              }
+          }
+          if (ratio > 0) winnings += amt * ratio;
+      }
+      balance += winnings; updateUI();
+      
+      let histArr = currentTable === 'EU' ? historyEU : historyAM; let freqObj = currentTable === 'EU' ? freqEU : freqAM;
+      histArr.push(winNum); freqObj[winNum]++; saveHistory(); updateAnalyticsBoard();
+
+      if (totalBetAmount === 0) { 
+          msgBox.innerText = `결과: ${winNum} - (관전 스핀) 다음 판에 배팅해 보세요!`; 
+      } else if(winnings > 0) { 
+          msgBox.innerText = `결과: ${winNum} - 축하합니다! $${winnings.toLocaleString()} 당첨!`; triggerSpecialEffect(); 
+      } else { 
+          msgBox.innerText = `결과: ${winNum} - 아쉽습니다. 칩을 잃었습니다.`; 
+      }
+      
+      let mode = document.querySelector('input[name="betMode"]:checked').value;
+      if (mode === '2' || (mode === '3' && winnings > 0)) { needToPayForKeptBets = true; betHistory = []; } 
+      else { setTimeout(() => { if(!isSpinning && isRoundOver) resetBoardState(); }, 3000); }
+      isRoundOver = true; 
+  }
+
+  function updateUI() { 
+      document.getElementById('balanceDisplay').innerText = balance.toLocaleString(); 
+      document.getElementById('totalBetDisplay').innerText = totalBetAmount.toLocaleString(); 
+      document.getElementById('vaultDisplay').innerText = vaultBalance.toLocaleString();
+      saveBalances();
+  }
+  
+  document.getElementById('btnDeposit').addEventListener('click', () => {
+      let amt = parseInt(prompt(`금고에 입금할 금액을 입력하세요. (소지 금액: $${balance})`));
+      if (!isNaN(amt) && amt > 0 && amt <= balance) { balance -= amt; vaultBalance += amt; updateUI(); }
+  });
+  document.getElementById('btnWithdraw').addEventListener('click', () => {
+      let amt = parseInt(prompt(`출금할 금액을 입력하세요. (금고 잔액: $${vaultBalance})`));
+      if (!isNaN(amt) && amt > 0 && amt <= vaultBalance) { vaultBalance -= amt; balance += amt; updateUI(); }
+  });
+  
+  document.getElementById('btnIssueVoucher').addEventListener('click', () => {
+      let amt = parseInt(prompt("수표 발행 금액:"));
+      if (!isNaN(amt) && amt > 0 && amt <= balance) { 
+          balance -= amt; 
+          let rand = Math.random().toString(36).substr(2, 6).toUpperCase();
+          let checksum = btoa(amt + "CASINO" + rand).replace(/=/g, '').substr(0, 6).toUpperCase();
+          let code = `SEC-${amt}-${rand}-${checksum}`;
+          updateUI(); 
+          alert(`바우처 코드: ${code}`); 
+      }
+  });
+  
+  document.getElementById('btnRedeemVoucher').addEventListener('click', () => {
+      let code = prompt("바우처 코드 입력:"); if(!code) return;
+      
+      if(code.trim().toUpperCase() === "VIP-GOLD-777") {
+          balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
+          alert("🚨 [카지노 보안국 알림]\n\n비정상적인 버그 악용 기록이 적발되었습니다.\n귀하의 지갑과 금고의 모든 자산이 0원으로 강제 압류되었습니다.\n\n- Casino Security -"); 
+          return;
+      }
+      
+      let p = code.split('-'); 
+      
+      if(p[0] === "VIP") {
+          alert("🚨 [보안 경고] 구 버전 바우처(VIP-***)는 신규 보안 갱신으로 인해 모두 만료 및 폐기되었습니다.");
+          return;
+      }
+      
+      if(p[0]==="SEC" && p.length===4) {
+          let amt = parseInt(p[1]);
+          let rand = p[2];
+          let providedChecksum = p[3];
+          let expectedChecksum = btoa(amt + "CASINO" + rand).replace(/=/g, '').substr(0, 6).toUpperCase();
+
+          if (providedChecksum !== expectedChecksum) {
+              balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
+              alert("🚨 [보안국 긴급 알림]\n\n위조 수표(금액 조작) 사용이 적발되었습니다!\n무관용 원칙에 따라 귀하의 지갑과 금고의 모든 자산이 0원으로 강제 몰수됩니다.");
+              return;
+          }
+
+          let uniqueId = rand + providedChecksum;
+          if(usedVouchers.includes(uniqueId)) {
+              balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
+              alert("🚨 [보안국 긴급 알림]\n\n폐기된 수표를 재사용하려는 부정 행위가 적발되었습니다!\n징벌적 조치로 귀하의 지갑과 금고의 모든 자산이 0원으로 몰수됩니다.");
+          } else {
+              balance+=amt; 
+              usedVouchers.push(uniqueId); 
+              localStorage.setItem('casino_vip_used_vouchers', JSON.stringify(usedVouchers));
+              updateUI(); 
+              alert(`✅ 입금 완료: $${amt.toLocaleString()} 정상 충전 및 해당 수표 영구 폐기 완료.`);
+          }
+      } else {
+          alert("❌ 유효하지 않은 바우처 코드 형식입니다.");
+      }
+  });
+  
+  // 충전: 대입(=)이 아니라 더하기(+=). 잔액이 있어도 깎이지 않는다.
+  document.getElementById('btnRecharge').addEventListener('click', () => {
+      balance += RECHARGE_AMOUNT;
+      updateUI();
+      msgBox.innerText = `💰 $${RECHARGE_AMOUNT.toLocaleString()} 충전 완료. (지갑: $${balance.toLocaleString()})`;
+  });
+
+  function updateAnalyticsBoard() {
+      let histArr = currentTable === 'EU' ? historyEU : historyAM;
+      let freqObj = currentTable === 'EU' ? freqEU : freqAM;
+      const disp = document.getElementById('historyDisplay'); disp.innerHTML = '';
+      let recent = histArr.slice(-20);
+      if(recent.length === 0) { disp.innerHTML = '<div style="color:#555; font-size:0.9rem; padding-bottom:10px; font-weight:bold;">스핀 기록이 없습니다.</div>'; }
+      recent.forEach((n, i) => {
+          let w = document.createElement('div'); w.className = 'ball-wrapper';
+          let lbl = document.createElement('div'); lbl.className = 'recent-label'; lbl.innerText = i === recent.length-1 ? 'NEW' : ' ';
+          let b = document.createElement('span'); 
+          b.className = `history-ball ${(n===0||n==='00')?'zero':(redNumbers.includes(Number(n))?'red':'black')}`; b.innerText = n;
+          w.appendChild(lbl); w.appendChild(b); disp.appendChild(w);
+      });
+      let sorted = Object.keys(freqObj).sort((a, b) => freqObj[b] - freqObj[a]);
+      document.getElementById('hotDisplay').innerText = sorted.slice(0,3).join(',');
+      document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
+  }
+
+  applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); startAutoTimer();
+
+})();
+</script>
+
+<script>
+  // 서비스 워커는 HTTPS(또는 localhost)에서만 등록된다.
+  // file:// 로 열었을 때는 조용히 실패하고 게임은 그대로 동작한다.
+  if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+  }
+</script>
+
+</body>
+</html>
