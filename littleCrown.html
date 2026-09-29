@@ -174,6 +174,7 @@
 <body>
 
   <input type="file" id="dealerImgUpload" style="display:none;" accept="image/*">
+  <input type="file" id="restoreFileInput" style="display:none;" accept="application/json,.json">
 
   <canvas id="fxCanvas"></canvas>
 
@@ -217,6 +218,10 @@
           <div class="vault-btn-group">
               <button class="btn-vault" id="btnIssueVoucher" style="background:#8e44ad; border-color:#9b59b6;">수표 발행</button>
               <button class="btn-vault" id="btnRedeemVoucher" style="background:#f39c12; border-color:#f1c40f;">수표 입금</button>
+          </div>
+          <div class="vault-btn-group">
+              <button class="btn-vault" id="btnBackup" style="background:#16a085; border-color:#1abc9c;">💾 백업</button>
+              <button class="btn-vault" id="btnRestore" style="background:#2980b9; border-color:#3498db;">📂 복원</button>
           </div>
         </div>
       </div>
@@ -336,17 +341,43 @@
 
   applyDealerImage('EU');
   dealerImgEl.addEventListener('click', () => { uploadInput.click(); });
+  // 폰 사진은 base64로 4~10MB라 localStorage 한도(약 5MB)를 그냥 넘긴다.
+  // 가운데를 정사각형으로 잘라 256px JPEG로 줄이면 20KB 안팎이 되고, 백업 파일도 가벼워진다.
+  const DEALER_IMG_SIZE = 256;
+
+  function downscaleImage(dataUrl, size) {
+      return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+              const side = Math.min(img.width, img.height);
+              const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+              const cv = document.createElement('canvas');
+              cv.width = cv.height = size;
+              cv.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, size, size);
+              resolve(cv.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'));
+          img.src = dataUrl;
+      });
+  }
+
   uploadInput.addEventListener('change', function(e) {
       const file = e.target.files[0];
+      e.target.value = '';                      // 같은 파일을 다시 골라도 change가 뜨도록
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(event) {
-          const base64Str = event.target.result;
-          dealerImages[currentTable] = base64Str;
-          applyDealerImage(currentTable);
-          if(currentTable === 'EU') localStorage.setItem('casino_vip_img_eu', base64Str);
-          else localStorage.setItem('casino_vip_img_am', base64Str);
-          alert("✅ 딜러 프로필이 브라우저에 성공적으로 영구 등록되었습니다.");
+          downscaleImage(event.target.result, DEALER_IMG_SIZE).then(small => {
+              dealerImages[currentTable] = small;
+              applyDealerImage(currentTable);
+              try {
+                  localStorage.setItem(currentTable === 'EU' ? 'casino_vip_img_eu' : 'casino_vip_img_am', small);
+                  alert("✅ 딜러 프로필이 등록되었습니다.");
+              } catch (err) {
+                  // 저장에 실패해도 화면에는 이미 적용돼 있다. 그 사실을 정확히 알린다.
+                  alert("⚠️ 저장 공간이 부족해 사진을 보관하지 못했습니다.\n\n지금 화면에는 적용되지만 새로고침하면 사라집니다.\n금고의 '백업'으로 다른 데이터를 먼저 내보낸 뒤 정리해 보세요.");
+              }
+          }).catch(err => alert("❌ " + err.message));
       };
       reader.readAsDataURL(file);
   });
@@ -1057,6 +1088,109 @@
   updateRechargeButton();
   // 자정을 넘겨 켜둔 경우에도 버튼이 알아서 풀리도록 한다.
   setInterval(updateRechargeButton, 60000);
+
+  /* ═══════════════ 백업 / 복원 ═══════════════
+     localStorage는 주소(origin)마다 따로 놀고, iOS는 웹앱을 오래 안 열면
+     저장 데이터를 정리할 수 있다. 파일 하나로 빼둘 수 있게 한다. */
+  const SAVE_KEYS = [
+      'casino_vip_balance_uni', 'casino_vip_vault_uni',
+      'casino_vip_hist_eu', 'casino_vip_freq_eu',
+      'casino_vip_hist_am', 'casino_vip_freq_am',
+      'casino_vip_inventory', 'casino_vip_equipped',
+      'casino_vip_img_eu', 'casino_vip_img_am',
+      'casino_vip_used_vouchers', 'casino_vip_recharge_day'
+  ];
+
+  function buildSaveData() {
+      const data = {};
+      SAVE_KEYS.forEach(k => {
+          const v = localStorage.getItem(k);
+          if (v !== null) data[k] = v;
+      });
+      return JSON.stringify({ app: 'littlecrown', version: 1, savedAt: new Date().toISOString(), data }, null, 2);
+  }
+
+  async function exportSave() {
+      const json = buildSaveData();
+      const name = `littlecrown-backup-${todayKey()}.json`;
+
+      // iOS에서는 공유 시트가 가장 확실하다. 파일 앱·메모·카톡 등으로 바로 저장된다.
+      try {
+          const file = new File([json], name, { type: 'application/json' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: 'Little Crown 백업' });
+              return;
+          }
+      } catch (err) {
+          if (err && err.name === 'AbortError') return;   // 사용자가 공유를 취소함
+      }
+
+      // 일반 다운로드 (안드로이드/PC)
+      try {
+          const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+          const a = document.createElement('a');
+          a.href = url; a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          msgBox.innerText = `💾 백업 파일을 저장했습니다. (${name})`;
+          return;
+      } catch (err) { /* 아래 클립보드로 */ }
+
+      // 마지막 수단
+      try {
+          await navigator.clipboard.writeText(json);
+          alert("📋 파일로 저장할 수 없어 백업 내용을 클립보드에 복사했습니다.\n메모장 등에 붙여넣어 보관하세요.");
+      } catch (err) {
+          alert("❌ 백업을 내보내지 못했습니다.");
+      }
+  }
+
+  function applySaveData(text) {
+      let parsed;
+      try { parsed = JSON.parse(text); }
+      catch (e) { alert("❌ 백업 파일을 읽을 수 없습니다. (형식 오류)"); return; }
+
+      if (!parsed || parsed.app !== 'littlecrown' || !parsed.data) {
+          alert("❌ Little Crown 백업 파일이 아닙니다."); return;
+      }
+      const incoming = SAVE_KEYS.filter(k => k in parsed.data);
+      if (incoming.length === 0) { alert("❌ 복원할 데이터가 들어 있지 않습니다."); return; }
+
+      const when = parsed.savedAt ? new Date(parsed.savedAt).toLocaleString() : '알 수 없음';
+      const bal = Number(parsed.data['casino_vip_balance_uni'] || 0).toLocaleString();
+      const vault = Number(parsed.data['casino_vip_vault_uni'] || 0).toLocaleString();
+      if (!confirm(`백업 시점: ${when}\n지갑: $${bal}   금고: $${vault}\n\n지금 이 기기의 데이터를 모두 덮어씁니다. 계속할까요?`)) return;
+
+      try {
+          SAVE_KEYS.forEach(k => localStorage.removeItem(k));
+          incoming.forEach(k => localStorage.setItem(k, parsed.data[k]));
+      } catch (err) {
+          alert("❌ 저장 공간이 부족해 복원하지 못했습니다."); return;
+      }
+      alert("✅ 복원했습니다. 화면을 다시 불러옵니다.");
+      location.reload();
+  }
+
+  const restoreInput = document.getElementById('restoreFileInput');
+  document.getElementById('btnBackup').addEventListener('click', exportSave);
+  document.getElementById('btnRestore').addEventListener('click', () => restoreInput.click());
+  restoreInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => applySaveData(ev.target.result);
+      r.onerror = () => alert("❌ 파일을 읽지 못했습니다.");
+      r.readAsText(f);
+  });
+
+  // 저장 공간이 부족해도 이 사이트 데이터는 지우지 말아 달라고 브라우저에 요청한다.
+  // 안드로이드에서 설치된 PWA면 대체로 승인되고, iOS에서는 효과가 제한적이다.
+  if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted()
+          .then(already => { if (!already) return navigator.storage.persist(); })
+          .catch(() => {});
+  }
 
   function updateAnalyticsBoard() {
       let histArr = currentTable === 'EU' ? historyEU : historyAM;
