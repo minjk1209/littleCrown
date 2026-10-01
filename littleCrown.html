@@ -585,10 +585,10 @@
   const TAB_TEXT = { EU: 'European Table (Single 0)', AM: 'American Table (0 & 00)' };
 
   const tables = {
-      EU: { placedBets: {}, betHistory: [], totalBetAmount: 0,
-            isRoundOver: false, needToPayForKeptBets: false, timeLeft: 30, pause: 0 },
-      AM: { placedBets: {}, betHistory: [], totalBetAmount: 0,
-            isRoundOver: false, needToPayForKeptBets: false, timeLeft: 15, pause: 0 }
+      EU: { placedBets: {}, betHistory: [], totalBetAmount: 0, isRoundOver: false,
+            needToPayForKeptBets: false, timeLeft: 30, pause: 0, pendingResult: null },
+      AM: { placedBets: {}, betHistory: [], totalBetAmount: 0, isRoundOver: false,
+            needToPayForKeptBets: false, timeLeft: 15, pause: 0, pendingResult: null }
   };
   let bgTimer = null;
   let bgNoticeTimer = null;
@@ -787,8 +787,11 @@
       }
   }
 
-  // 화면에 없는 테이블의 한 판. 애니메이션 없이 결과만 뽑아 즉시 정산한다.
-  function spinBackground(table) {
+  /* 화면에 없는 테이블의 한 판은 두 단계로 나뉜다.
+     구슬이 구르기 시작할 때 숫자가 정해지고(begin), 멈출 때 알린다(finish).
+     한 번에 처리하면 결과가 먼저 뜬 뒤에 탭이 9초 동안 "SPIN"이라고 표시하는
+     앞뒤가 뒤집힌 상태가 된다. */
+  function beginBackgroundSpin(table) {
       const st = tables[table];
 
       // 활성 테이블의 handleKeptBets 와 같은 규칙으로 유지 베팅을 재결제한다.
@@ -802,7 +805,18 @@
       }
 
       const wheel = table === 'EU' ? wheelNumEU : wheelNumAM;
-      const winNum = wheel[Math.floor(Math.random() * wheel.length)];
+      st.pendingResult = wheel[Math.floor(Math.random() * wheel.length)];
+      updateUI();
+  }
+
+  function finishBackgroundSpin(table) {
+      const st = tables[table];
+      if (st.pendingResult === null) return;
+
+      const winNum = st.pendingResult;
+      st.pendingResult = null;
+      st.pause = 0; st.timeLeft = 30;
+
       const winnings = computeWinnings(st.placedBets, winNum);
       balance += winnings;
       recordResult(table, winNum);
@@ -824,13 +838,17 @@
       updateTabLabels();
       bgTimer = setInterval(() => {
           const st = tables[table];
-          // 활성 테이블이 구슬 구르는 동안 타이머를 멈추므로, 뒷 테이블도 같은 시간만큼 쉬게 해
-          // 두 테이블의 간격이 유지되도록 한다.
-          if (st.pause > 0) { st.pause--; updateTabLabels(); return; }
+          // 구슬이 구르는 9초. 활성 테이블도 이 동안 타이머가 멈추므로 두 테이블의 간격이 유지된다.
+          if (st.pause > 0) {
+              st.pause--;
+              if (st.pause === 0) finishBackgroundSpin(table);   // 구슬이 멈추는 순간에 알린다
+              updateTabLabels();
+              return;
+          }
           st.timeLeft--;
           if (st.timeLeft <= 0) {
-              spinBackground(table);
-              st.timeLeft = 30; st.pause = 9;
+              beginBackgroundSpin(table);    // 숫자는 여기서 정해지지만 아직 알리지 않는다
+              st.pause = 9;
           }
           updateTabLabels();
       }, 1000);
@@ -840,7 +858,7 @@
       const st = tables[table];
       st.placedBets = placedBets; st.betHistory = betHistory; st.totalBetAmount = totalBetAmount;
       st.isRoundOver = isRoundOver; st.needToPayForKeptBets = needToPayForKeptBets;
-      st.timeLeft = betTimeLeft; st.pause = 0;
+      st.timeLeft = betTimeLeft; st.pause = 0; st.pendingResult = null;
   }
 
   function loadActiveFrom(table) {
@@ -858,6 +876,11 @@
       const from = currentTable;
       if (autoTimer) clearInterval(autoTimer);
       if (bgTimer) clearInterval(bgTimer);
+
+      // 넘어가려는 테이블이 마침 구르는 중이면 그 판을 먼저 끝내고 간다.
+      // (전환을 막지 않는 대신, 결과가 미정인 채로 활성 테이블이 되는 일을 없앤다)
+      if (tables[mode].pendingResult !== null) finishBackgroundSpin(mode);
+
       saveActiveInto(from);
       setChipsVisible(tables[from].placedBets, false);
 
