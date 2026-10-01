@@ -124,11 +124,15 @@
             cursor: pointer; box-sizing: border-box; overflow: hidden; white-space: nowrap; line-height: 1; }
   .rt-num.red { background: #c0392b; } .rt-num.black { background: #1a1a1a; } .rt-num.zero { background: #27ae60; }
   .rt-end .rt-num { height: auto; border-radius: 60px; }
-  .rt-calls { display: flex; gap: 5px; padding: 7px 5px; }
-  .rt-call { flex: 1; min-width: 0; padding: 8px 2px; background: rgba(0,0,0,0.45); color: #FFD700; border: 1px solid #D4AF37;
-             border-radius: 6px; font-weight: bold; font-size: clamp(8px, 1.9vw, 13px); line-height: 1.35; cursor: pointer;
-             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rt-call small { display: block; color: #aaa; font-weight: normal; font-size: 0.78em; }
+  /* 4등분 그리드. flex 로 두면 글자 길이에 따라 "ORPHELINS" 만 잘려 들쭉날쭉해진다. */
+  .rt-calls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px 6px; }
+  .rt-call { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+             min-width: 0; padding: 9px 4px; background: rgba(0,0,0,0.45); color: #FFD700;
+             border: 1px solid #D4AF37; border-radius: 6px; font-weight: bold; line-height: 1.2; cursor: pointer; }
+  .rt-call-t { max-width: 100%; font-size: clamp(9px, 2.1vw, 14px); letter-spacing: 0.5px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-call small { max-width: 100%; color: #aaa; font-weight: normal; white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; font-size: clamp(7px, 1.6vw, 11px); }
 
   /* 잔액은 왼쪽, 버튼 묶음은 오른쪽. space-around 로 5개를 흩뿌리면 간격이 들쭉날쭉해진다. */
   /* 잔액 -> Undo/Double/Clear 한 줄 -> 충전 한 줄, 위에서 아래로 쌓는다. */
@@ -229,6 +233,11 @@
     .shop-header h2 { font-size: 1.3rem; }
     .shop-body { padding: 12px; }
     .shop-tab { padding: 12px 0; font-size: 0.85rem; }
+  }
+
+  /* 폰 세로처럼 아주 좁을 때만 콜 벳을 2x2 로. 폰에서 제일 쓸모 있는 버튼이라 넓게 준다. */
+  @media (max-width: 480px) {
+    .rt-calls { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
@@ -761,7 +770,7 @@
        ['voisins', 'VOISINS', '숫자17 · 칩9'], ['zero', 'JEU 0', '숫자7 · 칩4']].forEach(([k, label, sub]) => {
           const b = document.createElement('button');
           b.className = 'rt-call';
-          b.innerHTML = `${label}<small>${sub}</small>`;
+          b.innerHTML = `<span class="rt-call-t">${label}</span><small>${sub}</small>`;
           b.addEventListener('click', () => placeCallBet(k));
           calls.appendChild(b);
       });
