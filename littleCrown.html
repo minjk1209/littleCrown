@@ -182,6 +182,17 @@
   .btn-buy.owned { background: #34495e; color: white; }
   .btn-buy.equipped { background: #2ecc71; color: black; cursor: default; }
 
+  /* 뒷 테이블이 도는 9초 동안만 화면 구석에 떠 있는 작은 룰렛.
+     fixed 라 본문 레이아웃을 밀지 않는다. */
+  .mini-wheel { position: fixed; top: 12px; right: 12px; z-index: 900; display: none;
+                background: rgba(10,10,10,0.92); border: 2px solid #D4AF37; border-radius: 12px;
+                padding: 8px 10px; text-align: center; box-shadow: 0 6px 22px rgba(0,0,0,0.75); }
+  .mini-wheel.show { display: block; animation: nmbIn 0.25s ease-out; }
+  .mini-wheel canvas { display: block; width: clamp(88px, 22vw, 150px); height: clamp(88px, 22vw, 150px);
+                       border-radius: 50%; background: #111; border: 3px solid #ccc; }
+  .mw-label { color: #D4AF37; font-size: clamp(9px, 2vw, 12px); font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; }
+  .mw-result { color: #fff; font-size: clamp(11px, 2.6vw, 16px); font-weight: bold; margin-top: 5px; min-height: 1.2em; }
+
   #fxCanvas { position: fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; display:none; }
 
   /* 휠 + 보드를 나란히 두면 1146px가 필요하다. 그보다 좁으면 위아래로 쌓는다. */
@@ -222,6 +233,12 @@
   <input type="file" id="restoreFileInput" style="display:none;" accept="application/json,.json">
 
   <canvas id="fxCanvas"></canvas>
+
+  <div class="mini-wheel" id="miniWheel">
+      <div class="mw-label" id="miniWheelLabel"></div>
+      <canvas id="miniWheelCanvas" width="300" height="300"></canvas>
+      <div class="mw-result" id="miniWheelResult"></div>
+  </div>
 
   <div class="top-bar">
       <div class="table-selector">
@@ -806,6 +823,7 @@
 
       const wheel = table === 'EU' ? wheelNumEU : wheelNumAM;
       st.pendingResult = wheel[Math.floor(Math.random() * wheel.length)];
+      startMiniSpin(table, st.pendingResult, 9000);   // 타이머의 9초 SPIN 구간과 맞춘다
       updateUI();
   }
 
@@ -816,6 +834,7 @@
       const winNum = st.pendingResult;
       st.pendingResult = null;
       st.pause = 0; st.timeLeft = 30;
+      endMiniSpin(winNum);
 
       const winnings = computeWinnings(st.placedBets, winNum);
       balance += winnings;
@@ -1227,9 +1246,11 @@
   
   function drawWheelStatic() { drawWheel(startAngle, ballAngle, ballRadius); }
   
-  function drawWheel(angleOffset, bAngle, bRad) {
-      ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(150, 150);
-      let wheels = currentTable === 'EU' ? wheelNumEU : wheelNumAM; let arc = Math.PI / (wheels.length / 2);
+  /* 어느 캔버스에든 그릴 수 있게 분리했다. 캔버스 내부 크기는 300x300 으로 같고,
+     화면에 보이는 크기만 CSS로 다르다. 장착한 휠/구슬 스킨은 둘 다 그대로 적용된다. */
+  function renderWheel(ctx, wheels, angleOffset, bAngle, bRad, showBall) {
+      ctx.clearRect(0,0,300,300); ctx.translate(150, 150);
+      let arc = Math.PI / (wheels.length / 2);
 
       let eqW = equipped.wheels;
       let bCol = "#3e2b1c", rCol = "#8e6c4e", pR = "#c0392b", pB = "#111", pZ = "#27ae60", nCol = "white";
@@ -1251,7 +1272,7 @@
           ctx.rotate(angle + arc/2 + Math.PI/2); ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.fillText(num, 0, 0); ctx.restore();
       }
       
-      if (isSpinning || bRad < 130) {
+      if (showBall) {
           let eqB = equipped.balls;
           let ballF = "#FFF"; ctx.shadowBlur = 0;
           if(eqB==='b2') ballF = "#222";
@@ -1264,6 +1285,63 @@
           ctx.arc(bx, by, 6, 0, 2 * Math.PI); ctx.fillStyle = ballF; ctx.fill(); ctx.shadowBlur = 0;
       }
       ctx.translate(-150, -150);
+  }
+
+  function drawWheel(angleOffset, bAngle, bRad) {
+      const wheels = currentTable === 'EU' ? wheelNumEU : wheelNumAM;
+      renderWheel(ctx, wheels, angleOffset, bAngle, bRad, isSpinning || bRad < 130);
+  }
+
+  /* ═══════════ 미니 휠 : 뒷 테이블이 도는 모습 ═══════════ */
+  const miniPanel = document.getElementById('miniWheel');
+  const miniCtx = document.getElementById('miniWheelCanvas').getContext('2d');
+  const miniLabelEl = document.getElementById('miniWheelLabel');
+  const miniResultEl = document.getElementById('miniWheelResult');
+  let miniRaf = null, miniHideTimer = null, miniFinal = null;
+
+  function stopMiniSpin() {
+      if (miniRaf) { cancelAnimationFrame(miniRaf); miniRaf = null; }
+  }
+
+  function startMiniSpin(table, targetNumber, durationMs) {
+      stopMiniSpin();
+      clearTimeout(miniHideTimer);
+
+      const wheels = table === 'EU' ? wheelNumEU : wheelNumAM;
+      const arc = Math.PI / (wheels.length / 2);
+      const idx = wheels.indexOf(targetNumber);
+
+      // 큰 휠과 같은 방식: 휠은 5바퀴, 구슬은 반대로 8바퀴 돌아 당첨 포켓에서 만난다.
+      const finalStart = Math.PI * 10;
+      const finalBall = finalStart + idx * arc + arc / 2 - Math.PI * 16;
+      miniFinal = { wheels, s: finalStart % (Math.PI * 2), b: finalBall % (Math.PI * 2) };
+
+      miniLabelEl.innerText = `${TABLE_LABEL[table]} 테이블`;
+      miniResultEl.innerText = '';
+      miniPanel.classList.add('show');
+
+      const t0 = Date.now();
+      const ease = x => 1 - Math.pow(1 - x, 3);
+      (function frame() {
+          const elapsed = Date.now() - t0;
+          if (elapsed >= durationMs) {
+              renderWheel(miniCtx, wheels, miniFinal.s, miniFinal.b, 105, true);
+              miniRaf = null; return;
+          }
+          const p = elapsed / durationMs, e = ease(p);
+          const bRad = p > 0.8 ? 135 - ((p - 0.8) / 0.2) * 30 : 135;
+          renderWheel(miniCtx, wheels, finalStart * e, finalBall * e, bRad, true);
+          miniRaf = requestAnimationFrame(frame);
+      })();
+  }
+
+  // 결과를 띄우고 잠시 뒤 사라진다. 전환 때 중간에 끊겨도 여기로 들어온다.
+  function endMiniSpin(winNum) {
+      stopMiniSpin();
+      if (miniFinal) renderWheel(miniCtx, miniFinal.wheels, miniFinal.s, miniFinal.b, 105, true);
+      miniResultEl.innerText = winNum;
+      clearTimeout(miniHideTimer);
+      miniHideTimer = setTimeout(() => miniPanel.classList.remove('show'), 3500);
   }
 
   // 💡 수정됨: 스핀 시작 시 관전 모드 메시지 분기
