@@ -373,7 +373,8 @@
 (function() {
   let balance = 500; let vaultBalance = 0; 
   let currentChip = 10; let placedBets = {}; let betHistory = []; let totalBetAmount = 0;
-  const RECHARGE_AMOUNT = 9000;   // 하루 한 번 충전되는 금액
+  const RECHARGE_AMOUNT = 9000;        // 한 번에 충전되는 금액
+  const RECHARGE_DAILY_LIMIT = false;  // ← true 로 바꾸면 하루 1회 제한이 다시 걸린다 (테스트 중 해제)
   let usedVouchers = JSON.parse(localStorage.getItem('casino_vip_used_vouchers')) || [];
 
   try { 
@@ -1564,6 +1565,7 @@
   }
 
   function canRecharge() {
+      if (!RECHARGE_DAILY_LIMIT) return true;
       return localStorage.getItem('casino_vip_recharge_day') !== todayKey();
   }
 
@@ -1583,7 +1585,8 @@
       localStorage.setItem('casino_vip_recharge_day', todayKey());
       updateRechargeButton();
       updateUI();
-      msgBox.innerText = `💰 $${RECHARGE_AMOUNT.toLocaleString()} 충전 완료. (지갑: $${balance.toLocaleString()})`;
+      msgBox.innerText = `💰 $${RECHARGE_AMOUNT.toLocaleString()} 충전 완료. (지갑: $${balance.toLocaleString()})`
+                       + (RECHARGE_DAILY_LIMIT ? '' : '  ⚠️ 하루 1회 제한 해제 중');
   });
 
   updateRechargeButton();
