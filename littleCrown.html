@@ -96,6 +96,25 @@
   .outside-bets-1 { display: grid; grid-template-columns: var(--cell) repeat(3, calc(var(--cell) * 4)) var(--cell); margin-top: -1px; } .outside-bets-2 { display: grid; grid-template-columns: var(--cell) repeat(6, calc(var(--cell) * 2)) var(--cell); margin-top: -1px; }
   .out-cell { height: calc(var(--cell) * 0.8); font-size: calc(var(--cell) * 0.3); display: flex; align-items: center; justify-content: center; border: 1px solid #fff; cursor: pointer; font-weight: bold; box-sizing: border-box; margin-left: -1px; margin-top: -1px; } .out-cell:hover { background: rgba(255,255,255,0.1); } .spacer { border: none; visibility: hidden; }
 
+  /* ───── 레이스트랙 : 휠에 박힌 순서대로 늘어놓은 콜 벳 입력판 (유럽 전용) ───── */
+  .rt-toggle { background: #34495e; color: #D4AF37; border: 2px solid #D4AF37; padding: 8px 22px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 12px; font-size: 0.95rem; transition: 0.2s; }
+  .rt-toggle.open { background: #D4AF37; color: #111; }
+  .racetrack { display: none; width: 100%; max-width: 850px; margin-bottom: 15px; padding: 6px; box-sizing: border-box;
+               background: #1e5631; border: 5px solid #4a3b2c; border-radius: 70px; box-shadow: inset 0 0 30px rgba(0,0,0,0.6); }
+  .racetrack.open { display: flex; }
+  .rt-end { flex: none; width: clamp(30px, 8vw, 46px); display: flex; }
+  .rt-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .rt-row { display: flex; }
+  .rt-num { flex: 1 1 0; min-width: 0; height: clamp(22px, 5.5vw, 30px); display: flex; align-items: center; justify-content: center;
+            font-size: clamp(7px, 1.8vw, 13px); font-weight: bold; color: #fff; border: 1px solid rgba(255,255,255,0.4);
+            cursor: pointer; box-sizing: border-box; overflow: hidden; }
+  .rt-num.red { background: #c0392b; } .rt-num.black { background: #1a1a1a; } .rt-num.zero { background: #27ae60; }
+  .rt-end .rt-num { height: auto; border-radius: 60px; }
+  .rt-calls { display: flex; gap: 5px; padding: 7px 5px; }
+  .rt-call { flex: 1; min-width: 0; padding: 8px 2px; background: rgba(0,0,0,0.45); color: #FFD700; border: 1px solid #D4AF37;
+             border-radius: 6px; font-weight: bold; font-size: clamp(8px, 1.9vw, 13px); line-height: 1.35; cursor: pointer; }
+  .rt-call small { display: block; color: #aaa; font-weight: normal; font-size: 0.78em; }
+
   .system-panel { width: 100%; max-width: 850px; display: flex; justify-content: space-around; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px; }
   .balance-group { display: flex; flex-direction: column; font-size: 1.2rem; align-items: center; border-right: 1px solid #555; padding-right: 20px; }
   .balance { font-size: 1.5rem; font-weight: bold; color: #2ECC71; }
@@ -165,7 +184,7 @@
 
   /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
   @media (hover: none) {
-    .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover { transform: none; }
+    .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover, .rt-toggle:hover { transform: none; }
     .btn-shop:hover { filter: none; }
     .cell:hover { filter: none; }
   }
@@ -253,6 +272,9 @@
       <div class="outside-bets-2"><div class="spacer"></div><div class="out-cell" data-bet="1-18">1 to 18</div><div class="out-cell" data-bet="even">EVEN</div><div class="out-cell red" data-bet="red" style="background:#c0392b;">RED</div><div class="out-cell black" data-bet="black" style="background:#1a1a1a;">BLACK</div><div class="out-cell" data-bet="odd">ODD</div><div class="out-cell" data-bet="19-36">19 to 36</div><div class="spacer"></div></div>
     </div>
   </div>
+
+  <button class="rt-toggle" id="rtToggle">🎯 레이스트랙</button>
+  <div class="racetrack" id="racetrack"></div>
 
   <div class="panel-base system-panel">
     <div class="balance-group">
@@ -537,6 +559,158 @@
   document.getElementById('tab-eu').addEventListener('click', () => switchTable('EU'));
   document.getElementById('tab-am').addEventListener('click', () => switchTable('AM'));
 
+  /* ═══════════════ 레이스트랙 ═══════════════
+     사각형 보드는 숫자 순서, 레이스트랙은 휠에 실제로 박힌 순서다.
+     휠에서 서로 붙어 있는 숫자들에 한 번에 거는 프랑스식 베팅(콜 벳)을 위한 입력판.
+     베팅 자체는 기존 보드에 칩으로 깔리므로 정산 로직은 건드리지 않는다.
+     아메리칸 휠은 순서가 다르고 00이 끼어 있어 정식 구역이 정의되지 않으므로 유럽 전용이다. */
+
+  const RT_NEIGHBOURS = 2;        // 이웃 베팅에서 양옆 몇 칸까지 묶을지
+
+  // 표준 콜 벳. chips 는 그 자리에 쌓는 칩 개수(2면 두 배로 건다).
+  const CALL_BETS = {
+      tiers:     { name: 'Tiers du Cylindre', spots: [
+                     { t: [5, 8] }, { t: [10, 11] }, { t: [13, 16] },
+                     { t: [23, 24] }, { t: [27, 30] }, { t: [33, 36] } ] },
+      orphelins: { name: 'Orphelins', spots: [
+                     { t: [1] }, { t: [6, 9] }, { t: [14, 17] }, { t: [17, 20] }, { t: [31, 34] } ] },
+      voisins:   { name: 'Voisins du Zéro', spots: [
+                     { t: [0, 2, 3], chips: 2 }, { t: [4, 7] }, { t: [12, 15] },
+                     { t: [18, 21] }, { t: [19, 22] },
+                     { t: [25, 26, 28, 29], chips: 2 }, { t: [32, 35] } ] },
+      zero:      { name: 'Jeu Zéro', spots: [
+                     { t: [0, 3] }, { t: [12, 15] }, { t: [26] }, { t: [32, 35] } ] }
+  };
+
+  const chipsOf = spot => spot.chips || 1;
+
+  function cellRectFor(num) {
+      const el = document.querySelector(`#boardWrapper .cell[data-num="${num}"]`);
+      return el ? el.getBoundingClientRect() : null;
+  }
+
+  // 여러 칸에 걸친 베팅은 그 칸들을 감싸는 사각형의 중심에 칩을 놓는다.
+  // 두 칸이면 사이 선, 네 칸이면 교차점이 정확히 중심이 된다.
+  function boardSpotFor(targets) {
+      const boardRect = document.getElementById('boardWrapper').getBoundingClientRect();
+      const plain = targets.filter(t => t !== 0 && t !== '00');
+      const hasZero = plain.length !== targets.length;
+      const rects = plain.map(cellRectFor).filter(Boolean);
+
+      if (!rects.length) {                       // 0 또는 00 단독
+          const z = cellRectFor(targets[0]);
+          if (!z) return null;
+          return { x: z.left - boardRect.left + z.width / 2, y: z.top - boardRect.top + z.height / 2 };
+      }
+      const l = Math.min(...rects.map(r => r.left)),  r2 = Math.max(...rects.map(r => r.right));
+      const t = Math.min(...rects.map(r => r.top)),   b  = Math.max(...rects.map(r => r.bottom));
+      // 0 이 섞인 베팅(트리오 0-2-3 등)은 숫자 그리드의 왼쪽 경계선 위에 놓인다.
+      const x = (hasZero ? l : (l + r2) / 2) - boardRect.left;
+      return { x, y: (t + b) / 2 - boardRect.top };
+  }
+
+  function placeCallBet(key) {
+      if (isSpinning) return;
+      if (currentTable !== 'EU') { msgBox.innerText = "콜 벳은 유럽 테이블에서만 가능합니다."; return; }
+      handleKeptBets();
+
+      const bet = CALL_BETS[key];
+      const chips = bet.spots.reduce((a, sp) => a + chipsOf(sp), 0);
+      const cost = chips * currentChip;
+      if (cost > balance) {
+          msgBox.innerText = `잔고가 부족합니다. ${bet.name} 는 칩 ${chips}개 ($${cost.toLocaleString()})가 필요합니다.`;
+          return;
+      }
+      const covered = new Set();
+      bet.spots.forEach(sp => {
+          const pos = boardSpotFor(sp.t);
+          if (!pos) return;
+          placeBet(sp.t.join(','), currentChip * chipsOf(sp), sp.t.slice(), pos.x, pos.y, true);
+          sp.t.forEach(n => covered.add(n));
+      });
+      msgBox.innerText = `🎯 ${bet.name} · 숫자 ${covered.size}개 · 칩 ${chips}개 · 총 $${cost.toLocaleString()}`;
+  }
+
+  function placeNeighbourBet(num) {
+      if (isSpinning) return;
+      handleKeptBets();
+      const wheel = currentTable === 'EU' ? wheelNumEU : wheelNumAM;
+      const i = wheel.indexOf(num);
+      if (i < 0) return;
+
+      const picks = [];
+      for (let d = -RT_NEIGHBOURS; d <= RT_NEIGHBOURS; d++) picks.push(wheel[(i + d + wheel.length) % wheel.length]);
+
+      const cost = picks.length * currentChip;
+      if (cost > balance) {
+          msgBox.innerText = `잔고가 부족합니다. 이웃 베팅은 칩 ${picks.length}개 ($${cost.toLocaleString()})가 필요합니다.`;
+          return;
+      }
+      picks.forEach(n => {
+          const pos = boardSpotFor([n]);
+          if (pos) placeBet(String(n), currentChip, [n], pos.x, pos.y, true);
+      });
+      msgBox.innerText = `🎯 ${num}번 이웃 베팅 · ${picks.join(', ')} · 각 36배 · 총 $${cost.toLocaleString()}`;
+  }
+
+  const rtToggle = document.getElementById('rtToggle');
+  const rtEl = document.getElementById('racetrack');
+
+  function buildRacetrack() {
+      const order = wheelNumEU;                  // 0 부터 시계방향 37칸
+      const top = order.slice(1, 18);            // 32 … 23   (17개, 왼→오)
+      const rightEnd = order[18];                // 10
+      const bottom = order.slice(19).reverse();  // 26 … 5    (18개, 왼→오)
+
+      function numCell(n) {
+          const d = document.createElement('div');
+          d.className = 'rt-num ' + (n === 0 ? 'zero' : (redNumbers.includes(n) ? 'red' : 'black'));
+          d.innerText = n;
+          d.title = `${n}번과 양옆 ${RT_NEIGHBOURS}개씩 · 숫자 ${RT_NEIGHBOURS * 2 + 1}개`;
+          d.addEventListener('click', () => placeNeighbourBet(n));
+          return d;
+      }
+      function row(nums) {
+          const r = document.createElement('div'); r.className = 'rt-row';
+          nums.forEach(n => r.appendChild(numCell(n)));
+          return r;
+      }
+
+      const calls = document.createElement('div'); calls.className = 'rt-calls';
+      [['tiers', 'TIERS', '숫자12 · 칩6'], ['orphelins', 'ORPHELINS', '숫자8 · 칩5'],
+       ['voisins', 'VOISINS', '숫자17 · 칩9'], ['zero', 'JEU 0', '숫자7 · 칩4']].forEach(([k, label, sub]) => {
+          const b = document.createElement('button');
+          b.className = 'rt-call';
+          b.innerHTML = `${label}<small>${sub}</small>`;
+          b.addEventListener('click', () => placeCallBet(k));
+          calls.appendChild(b);
+      });
+
+      const mid = document.createElement('div'); mid.className = 'rt-mid';
+      mid.appendChild(row(top)); mid.appendChild(calls); mid.appendChild(row(bottom));
+
+      const left = document.createElement('div'); left.className = 'rt-end'; left.appendChild(numCell(0));
+      const right = document.createElement('div'); right.className = 'rt-end'; right.appendChild(numCell(rightEnd));
+
+      rtEl.innerHTML = '';
+      rtEl.appendChild(left); rtEl.appendChild(mid); rtEl.appendChild(right);
+  }
+
+  function setRacetrackOpen(open) {
+      rtEl.classList.toggle('open', open);
+      rtToggle.classList.toggle('open', open);
+      rtToggle.innerText = open ? '🎯 레이스트랙 닫기' : '🎯 레이스트랙';
+  }
+
+  function updateRacetrackVisibility() {
+      const isEU = currentTable === 'EU';
+      rtToggle.style.display = isEU ? '' : 'none';
+      if (!isEU) setRacetrackOpen(false);
+  }
+
+  rtToggle.addEventListener('click', () => setRacetrackOpen(!rtEl.classList.contains('open')));
+  buildRacetrack();
+
   function switchTable(mode) {
       if (isSpinning) { msgBox.innerText = "스핀 중에는 이동 불가합니다."; return; }
       if (currentTable === mode) return; 
@@ -548,25 +722,25 @@
       applyDealerImage(mode);
       dealerNameEl.innerText = (mode === 'EU') ? "Virtual Dealer: MULBUM" : "Virtual Dealer: PENGUIN";
       
-      clearAllBets(); buildBoard(); updateAnalyticsBoard(); drawWheelStatic();
+      clearAllBets(); buildBoard(); updateAnalyticsBoard(); drawWheelStatic(); updateRacetrackVisibility();
   }
 
   function buildBoard() {
       const mainGrid = document.getElementById('main-grid'); const zeroContainer = document.getElementById('zero-container');
       mainGrid.innerHTML = ''; zeroContainer.innerHTML = '';
       if (currentTable === 'EU') {
-          let div = document.createElement('div'); div.className = 'cell zero-cell'; div.innerText = '0';
+          let div = document.createElement('div'); div.className = 'cell zero-cell'; div.innerText = '0'; div.dataset.num = '0';
           div.addEventListener('click', (e) => handleInsideBet(e, 0, true, null, null)); zeroContainer.appendChild(div);
       } else {
-          let div0 = document.createElement('div'); div0.className = 'cell zero-cell'; div0.innerText = '0';
-          let div00 = document.createElement('div'); div00.className = 'cell zero-cell'; div00.innerText = '00';
+          let div0 = document.createElement('div'); div0.className = 'cell zero-cell'; div0.innerText = '0'; div0.dataset.num = '0';
+          let div00 = document.createElement('div'); div00.className = 'cell zero-cell'; div00.innerText = '00'; div00.dataset.num = '00';
           div0.addEventListener('click', (e) => handleInsideBet(e, 0, true, null, null));
           div00.addEventListener('click', (e) => handleInsideBet(e, '00', true, null, null));
           zeroContainer.appendChild(div0); zeroContainer.appendChild(div00);
       }
       const numbersLayout = [ 3,6,9,12,15,18,21,24,27,30,33,36, 2,5,8,11,14,17,20,23,26,29,32,35, 1,4,7,10,13,16,19,22,25,28,31,34 ];
       numbersLayout.forEach((num, index) => {
-          let div = document.createElement('div'); div.className = `cell ${redNumbers.includes(num) ? 'red' : 'black'}`; div.innerText = num;
+          let div = document.createElement('div'); div.className = `cell ${redNumbers.includes(num) ? 'red' : 'black'}`; div.innerText = num; div.dataset.num = num;
           let row = Math.floor(index / 12) + 1; let col = (index % 12) + 1; div.style.gridArea = `${row} / ${col} / ${row + 1} / ${col + 1}`;
           div.addEventListener('click', (e) => handleInsideBet(e, num, false, row, col)); mainGrid.appendChild(div);
       });
