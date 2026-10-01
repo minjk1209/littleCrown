@@ -127,7 +127,10 @@
              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rt-call small { display: block; color: #aaa; font-weight: normal; font-size: 0.78em; }
 
-  .system-panel { width: 100%; max-width: 850px; display: flex; justify-content: space-around; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px; }
+  /* 잔액은 왼쪽, 버튼 묶음은 오른쪽. space-around 로 5개를 흩뿌리면 간격이 들쭉날쭉해진다. */
+  .system-panel { width: 100%; max-width: 850px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px; }
+  .sys-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  .sys-actions .btn-sys { min-width: 88px; text-align: center; }
   .balance-group { display: flex; flex-direction: column; font-size: 1.2rem; align-items: center; border-right: 1px solid #555; padding-right: 20px; white-space: nowrap; }
   .balance { font-size: 1.5rem; font-weight: bold; color: #2ECC71; }
   .btn-sys { background: #444; color: white; border: 1px solid #777; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
@@ -212,8 +215,10 @@
     .btn-shop { padding: 8px 18px; font-size: 1rem; }
     .top-dashboard { flex-direction: column; }
     .timer-board { padding: 8px 24px; font-size: 1.6rem; margin-bottom: 12px; }
-    .system-panel { gap: 8px; }
+    .system-panel { flex-direction: column; align-items: stretch; gap: 12px; }
     .balance-group { border-right: none; padding-right: 0; }
+    .sys-actions { justify-content: center; }
+    .sys-actions .btn-sys { flex: 1 1 calc(50% - 5px); min-width: 0; }
     .shop-header { padding: 14px; }
     .shop-header h2 { font-size: 1.3rem; }
     .shop-body { padding: 12px; }
@@ -329,10 +334,12 @@
         <div>Balance: $<span id="balanceDisplay" class="balance">500</span></div>
         <div style="font-size:1rem; color:#ccc;">Bet: $<span id="totalBetDisplay">0</span></div>
     </div>
-    <button class="btn-sys undo" id="btnUndo">Undo</button>
-    <button class="btn-sys double" id="btnDouble">Double</button>
-    <button class="btn-sys" id="btnClear">Clear</button>
-    <button class="btn-sys recharge" id="btnRecharge">💰 $9,000 충전</button>
+    <div class="sys-actions">
+      <button class="btn-sys undo" id="btnUndo">Undo</button>
+      <button class="btn-sys double" id="btnDouble">Double</button>
+      <button class="btn-sys" id="btnClear">Clear</button>
+      <button class="btn-sys recharge" id="btnRecharge">💰 $9,000 충전</button>
+    </div>
   </div>
   
   <div class="controls">
