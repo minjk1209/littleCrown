@@ -374,7 +374,7 @@
   let balance = 500; let vaultBalance = 0; 
   let currentChip = 10; let placedBets = {}; let betHistory = []; let totalBetAmount = 0;
   const RECHARGE_AMOUNT = 9000;        // 한 번에 충전되는 금액
-  const RECHARGE_DAILY_LIMIT = false;  // ← true 로 바꾸면 하루 1회 제한이 다시 걸린다 (테스트 중 해제)
+  const RECHARGE_DAILY_LIMIT = true;   // false 로 바꾸면 제한이 풀린다 (테스트용)
   let usedVouchers = JSON.parse(localStorage.getItem('casino_vip_used_vouchers')) || [];
 
   try { 
