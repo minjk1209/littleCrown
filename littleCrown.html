@@ -65,11 +65,11 @@
   .deck-title { width: 100%; color: #FFD700; font-weight: bold; letter-spacing: 1px; font-size: clamp(0.95rem, 2.4vw, 1.1rem); margin-bottom: 12px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 7px; }
   /* 기본 라디오 대신 선택형 버튼 3개. 라디오는 숨기되 그대로 두어
      input[name="betMode"]:checked 를 읽는 정산 코드는 건드리지 않는다. */
-  .deck-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+  .deck-options { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 320px; margin: 0 auto; }
   .deck-opt { cursor: pointer; display: block; min-width: 0; }
   .deck-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
   .deck-opt span { display: flex; align-items: center; justify-content: center; text-align: center;
-                   min-height: 46px; padding: 8px 6px; border-radius: 8px;
+                   min-height: 40px; padding: 8px 10px; border-radius: 8px;
                    border: 2px solid #3d6b45; background: rgba(0,0,0,0.3); color: #9fd8ab;
                    font-weight: bold; font-size: clamp(0.7rem, 1.6vw, 0.95rem); line-height: 1.25;
                    transition: 0.2s; }
@@ -1133,6 +1133,8 @@
           handleKeptBets();
           let startX = e.clientX; let startY = e.clientY;
           let initialLeft = parseFloat(marker.style.left); let initialTop = parseFloat(marker.style.top);
+          let moved = false;
+          const DRAG_SLOP = 6;   // 이만큼 움직여야 '옮기기'로 본다
           marker.style.zIndex = 1000;
           // 손가락이 칩 밖으로 나가도 이벤트가 계속 칩으로 오게 한다.
           try { marker.setPointerCapture(e.pointerId); } catch (err) {}
@@ -1144,8 +1146,10 @@
           }
           function onPointerMove(moveEvent) {
               if (moveEvent.pointerId !== e.pointerId) return;
-              marker.style.left = `${initialLeft + (moveEvent.clientX - startX)}px`;
-              marker.style.top = `${initialTop + (moveEvent.clientY - startY)}px`;
+              const dx = moveEvent.clientX - startX, dy = moveEvent.clientY - startY;
+              if (Math.abs(dx) > DRAG_SLOP || Math.abs(dy) > DRAG_SLOP) moved = true;
+              marker.style.left = `${initialLeft + dx}px`;
+              marker.style.top = `${initialTop + dy}px`;
           }
           // 전화가 오거나 제스처가 가로채이면 원래 자리로 되돌린다.
           function onPointerCancel(cancelEvent) {
@@ -1157,11 +1161,25 @@
           function onPointerUp(upEvent) {
               if (upEvent.pointerId !== e.pointerId) return;
               cleanup();
-              marker.style.zIndex = 100; marker.style.display = 'none';
+              marker.style.zIndex = 100;
+
+              /* 칩이 칸을 덮고 있어서, 같은 자리에 또 걸려고 누르면 칸이 아니라 칩이 눌린다.
+                 움직이지 않았다면 '옮기기'가 아니라 '같은 자리에 한 번 더'로 처리한다.
+                 (예전에는 같은 금액을 뺐다가 제자리에 다시 놓아 아무 변화가 없었다) */
+              if (!moved) {
+                  marker.style.left = `${initialLeft}px`; marker.style.top = `${initialTop}px`;
+                  const bet = placedBets[originalSpotKey];
+                  if (!bet) return;                                   // 라운드 정리로 사라진 경우
+                  if (currentChip > balance) { msgBox.innerText = "잔고가 부족합니다."; return; }
+                  placeBet(originalSpotKey, currentChip, bet.targets, initialLeft, initialTop, true);
+                  return;
+              }
+
+              marker.style.display = 'none';
               let dropEl = document.elementFromPoint(upEvent.clientX, upEvent.clientY); marker.style.display = 'flex';
               let cellEl = dropEl ? dropEl.closest('.cell, .out-cell') : null;
               
-              if (cellEl && !isSpinning) {
+              if (cellEl && !isSpinning && placedBets[originalSpotKey]) {
                   let betAmountToMove = placedBets[originalSpotKey].amount; balance += betAmountToMove; totalBetAmount -= betAmountToMove;
                   marker.remove(); delete placedBets[originalSpotKey];
                   let rect = cellEl.getBoundingClientRect(); let offsetX = upEvent.clientX - rect.left; let offsetY = upEvent.clientY - rect.top;
