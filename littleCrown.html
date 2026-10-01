@@ -62,10 +62,21 @@
   .panel-base { background: rgba(20,20,20,0.8); padding: 15px; border-radius: 10px; border: 1px solid #D4AF37; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; box-sizing: border-box; }
 
   .deck-panel { background: rgba(30,50,30,0.9); border-color: #2ECC71; flex-direction: column; width: 100%; flex: 1; justify-content: center; align-items: center; }
-  .deck-title { color: #FFD700; font-weight: bold; letter-spacing: 1px; font-size: 1.1rem; margin-bottom: 10px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
-  .deck-options { display: flex; width: 100%; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
-  .deck-options label { cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: color 0.2s; white-space: nowrap; }
-  .deck-options input[type="radio"] { accent-color: #2ECC71; cursor: pointer; }
+  .deck-title { width: 100%; color: #FFD700; font-weight: bold; letter-spacing: 1px; font-size: clamp(0.95rem, 2.4vw, 1.1rem); margin-bottom: 12px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 7px; }
+  /* 기본 라디오 대신 선택형 버튼 3개. 라디오는 숨기되 그대로 두어
+     input[name="betMode"]:checked 를 읽는 정산 코드는 건드리지 않는다. */
+  .deck-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+  .deck-opt { cursor: pointer; display: block; min-width: 0; }
+  .deck-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .deck-opt span { display: flex; align-items: center; justify-content: center; text-align: center;
+                   min-height: 46px; padding: 8px 6px; border-radius: 8px;
+                   border: 2px solid #3d6b45; background: rgba(0,0,0,0.3); color: #9fd8ab;
+                   font-weight: bold; font-size: clamp(0.7rem, 1.6vw, 0.95rem); line-height: 1.25;
+                   transition: 0.2s; }
+  .deck-opt:hover span { border-color: #2ECC71; color: #d6ffe2; }
+  .deck-opt input:checked + span { background: linear-gradient(to bottom, #2ECC71, #1e8e4f);
+                                   border-color: #7ef7a8; color: #06230f; box-shadow: 0 0 12px rgba(46,204,113,0.45); }
+  .deck-opt input:focus-visible + span { outline: 2px solid #FFD700; outline-offset: 2px; }
 
   .stats-row { display: flex; width: 100%; max-width: 850px; margin-bottom: 15px; }
   .analytics-panel { flex-direction: column; justify-content: center; align-items: center; gap: 10px; border-color: #555; background: rgba(30,30,30,0.9); width: 100%; flex: 2; }
@@ -247,6 +258,8 @@
   /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
   @media (hover: none) {
     .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover, .rt-toggle:hover { transform: none; }
+    .deck-opt:hover span { border-color: #3d6b45; color: #9fd8ab; }
+    .deck-opt input:checked + span { border-color: #7ef7a8; color: #06230f; }
     .btn-shop:hover { filter: none; }
     .cell:hover { filter: none; }
   }
@@ -288,9 +301,9 @@
       <div class="panel-base deck-panel">
         <div class="deck-title">⚙️ 덱 세팅 모드</div>
         <div class="deck-options">
-            <label><input type="radio" name="betMode" value="1" checked> 매 판 초기화</label>
-            <label><input type="radio" name="betMode" value="2"> 항상 유지</label>
-            <label><input type="radio" name="betMode" value="3"> 승리 시에만 유지</label>
+            <label class="deck-opt"><input type="radio" name="betMode" value="1" checked><span>매 판 초기화</span></label>
+            <label class="deck-opt"><input type="radio" name="betMode" value="2"><span>항상 유지</span></label>
+            <label class="deck-opt"><input type="radio" name="betMode" value="3"><span>승리 시에만 유지</span></label>
         </div>
       </div>
     </div>
