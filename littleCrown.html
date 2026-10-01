@@ -249,8 +249,8 @@
           <div class="zero-area" id="zero-container"></div>
           <div class="board-grid" id="main-grid"></div>
       </div>
-      <div class="outside-bets-1"><div class="spacer" style="width:50px;"></div><div class="out-cell" data-bet="1st12">1st 12</div><div class="out-cell" data-bet="2nd12">2nd 12</div><div class="out-cell" data-bet="3rd12">3rd 12</div><div class="spacer" style="width:50px;"></div></div>
-      <div class="outside-bets-2"><div class="spacer" style="width:50px;"></div><div class="out-cell" data-bet="1-18">1 to 18</div><div class="out-cell" data-bet="even">EVEN</div><div class="out-cell red" data-bet="red" style="background:#c0392b;">RED</div><div class="out-cell black" data-bet="black" style="background:#1a1a1a;">BLACK</div><div class="out-cell" data-bet="odd">ODD</div><div class="out-cell" data-bet="19-36">19 to 36</div><div class="spacer" style="width:50px;"></div></div>
+      <div class="outside-bets-1"><div class="spacer"></div><div class="out-cell" data-bet="1st12">1st 12</div><div class="out-cell" data-bet="2nd12">2nd 12</div><div class="out-cell" data-bet="3rd12">3rd 12</div><div class="spacer"></div></div>
+      <div class="outside-bets-2"><div class="spacer"></div><div class="out-cell" data-bet="1-18">1 to 18</div><div class="out-cell" data-bet="even">EVEN</div><div class="out-cell red" data-bet="red" style="background:#c0392b;">RED</div><div class="out-cell black" data-bet="black" style="background:#1a1a1a;">BLACK</div><div class="out-cell" data-bet="odd">ODD</div><div class="out-cell" data-bet="19-36">19 to 36</div><div class="spacer"></div></div>
     </div>
   </div>
 
@@ -648,6 +648,40 @@
       return amount;
   }
 
+  /* 칩 위치만 보고는 무슨 베팅인지 분간하기 어렵다.
+     베팅할 때마다 종류·대상 숫자·배당을 메시지로 알려준다. */
+  const OUTSIDE_BETS = {
+      'red':   { name: '레드',             ratio: 2 },
+      'black': { name: '블랙',             ratio: 2 },
+      'even':  { name: '짝수',             ratio: 2 },
+      'odd':   { name: '홀수',             ratio: 2 },
+      '1-18':  { name: '로우 (1-18)',      ratio: 2 },
+      '19-36': { name: '하이 (19-36)',     ratio: 2 },
+      '1st12': { name: '1st 더즌 (1-12)',  ratio: 3 },
+      '2nd12': { name: '2nd 더즌 (13-24)', ratio: 3 },
+      '3rd12': { name: '3rd 더즌 (25-36)', ratio: 3 },
+      'col1':  { name: '컬럼 (1,4,7…34)',  ratio: 3 },
+      'col2':  { name: '컬럼 (2,5,8…35)',  ratio: 3 },
+      'col3':  { name: '컬럼 (3,6,9…36)',  ratio: 3 }
+  };
+
+  // 안쪽 베팅은 묶인 숫자 개수로 종류가 정해진다.
+  const INSIDE_BETS = { 1: '스트레이트', 2: '스플릿', 3: '스트리트', 4: '코너', 5: '파이브 넘버', 6: '식스 라인' };
+
+  function describeBet(spotKey, targets) {
+      const out = OUTSIDE_BETS[spotKey];
+      if (out) return { name: out.name, nums: '', ratio: out.ratio };
+
+      const n = targets.length;
+      const ratio = (n === 5) ? 7 : 36 / n;        // 파이브 넘버만 예외 (6:1)
+      let name = INSIDE_BETS[n] || `${n}개 숫자`;
+      if (targets.some(t => t === 0 || t === '00')) {   // 0 이 섞이면 이름이 다르다
+          if (n === 3) name = '트리오';
+          else if (n === 4) name = '퍼스트 포';
+      }
+      return { name, nums: targets.join(', '), ratio };
+  }
+
   function placeBet(spotKey, amount, targets, relX, relY, recordHistory) {
       balance -= amount; totalBetAmount += amount;
       if (!placedBets[spotKey]) {
@@ -660,6 +694,12 @@
       placedBets[spotKey].amount += amount;
       if (recordHistory) betHistory.push({ spotKey, amount, targets, chipX: relX, chipY: relY });
       placedBets[spotKey].element.innerText = formatChip(placedBets[spotKey].amount);
+
+      const info = describeBet(spotKey, placedBets[spotKey].targets);
+      const label = info.nums ? `${info.name} · ${info.nums}` : info.name;
+      placedBets[spotKey].element.title = `${label} · ${info.ratio}배`;   // PC에서 칩에 올리면 보인다
+      msgBox.innerText = `🎯 ${label} · ${info.ratio}배  (이 자리 누적 $${placedBets[spotKey].amount.toLocaleString()})`;
+
       updateUI();
   }
 
@@ -808,6 +848,7 @@
       if (isSpinning) return; handleKeptBets();
       if (totalBetAmount === 0 || balance < totalBetAmount) return;
       Object.values(placedBets).map(b => ({...b})).forEach(bet => placeBet(bet.targets.join(','), bet.amount, bet.targets, parseFloat(bet.element.style.left), parseFloat(bet.element.style.top), true));
+      msgBox.innerText = `⏫ 모든 베팅을 2배로 올렸습니다. (총 $${totalBetAmount.toLocaleString()})`;
   });
 
   function startAutoTimer() {
