@@ -22,13 +22,18 @@
   }
   body { background-color: #1a1a1a; background-image: radial-gradient(circle at top, #2b2b2b 0%, #111 80%); color: #ffffff; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; user-select: none; overflow-x: hidden; }
   
-  .top-bar { display: flex; width: 100%; max-width: 850px; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-  .table-selector { display: flex; gap: 20px; }
-  .btn-table { background: #333; color: #888; border: 2px solid #555; padding: 10px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
+  .top-bar { display: flex; width: 100%; max-width: 850px; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: stretch; margin-bottom: 20px; }
+  /* 비활성 탭에 붙는 카운트다운이 30s -> 9s 로 바뀌면 글자 수가 줄어 버튼 폭이 움찔거린다.
+     두 탭을 같은 폭으로 고정해 글자가 바뀌어도 자리가 흔들리지 않게 한다. */
+  .table-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1 1 auto; min-width: 0; }
+  .btn-table { background: #333; color: #888; border: 2px solid #555; padding: 10px 14px; font-size: clamp(0.78rem, 1.5vw, 1.1rem); font-weight: bold;
+               border-radius: 30px; cursor: pointer; transition: all 0.3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .btn-table.active { background: linear-gradient(to bottom, #D4AF37, #aa8529); color: black; border-color: #FFD700; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); }
   
   /* VIP SHOP 버튼 */
-  .btn-shop { background: linear-gradient(145deg, #8e44ad, #2c3e50); border: 2px solid #9b59b6; color: white; padding: 10px 25px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 0 15px rgba(155, 89, 182, 0.6); transition: 0.3s; animation: pulseShop 2s infinite; }
+  .btn-shop { flex: none; background: linear-gradient(145deg, #8e44ad, #2c3e50); border: 2px solid #9b59b6; color: white; padding: 10px 22px; border-radius: 30px;
+              font-size: clamp(0.9rem, 1.6vw, 1.2rem); font-weight: bold; cursor: pointer; white-space: nowrap;
+              box-shadow: 0 0 15px rgba(155, 89, 182, 0.6); transition: 0.3s; animation: pulseShop 2s infinite; }
   .btn-shop:hover { transform: scale(1.05); filter: brightness(1.2); }
   @keyframes pulseShop { 0% { box-shadow: 0 0 10px #9b59b6; } 50% { box-shadow: 0 0 25px #e056fd; } 100% { box-shadow: 0 0 10px #9b59b6; } }
 
@@ -222,10 +227,9 @@
     body { padding: 10px; }
     .game-container { padding: 8px; border-width: 3px; gap: 12px; }
     .roulette-wrapper { border-width: 5px; }
-    .top-bar { justify-content: center; }
-    .table-selector { gap: 8px; flex: 1 1 100%; justify-content: center; }
-    .btn-table { padding: 8px 14px; font-size: 0.85rem; }
-    .btn-shop { padding: 8px 18px; font-size: 1rem; }
+    .table-selector { gap: 8px; flex: 1 1 100%; }
+    .btn-table { padding: 9px 8px; }
+    .btn-shop { flex: 1 1 100%; padding: 9px 18px; }
     .top-dashboard { flex-direction: column; }
     .timer-board { padding: 8px 24px; font-size: 1.6rem; margin-bottom: 12px; }
     .system-panel { gap: 12px; }
@@ -626,6 +630,7 @@
      활성 경로(애니메이션·칩·UI)는 손대지 않고 그대로 두는 게 핵심이다. */
   const TABLE_LABEL = { EU: '유럽', AM: '아메리칸' };
   const TAB_TEXT = { EU: 'European Table (Single 0)', AM: 'American Table (0 & 00)' };
+  const TAB_TEXT_SHORT = { EU: 'EUROPEAN', AM: 'AMERICAN' };   // 좁은 화면용
 
   const tables = {
       EU: { placedBets: {}, betHistory: [], totalBetAmount: 0, isRoundOver: false,
@@ -811,9 +816,13 @@
   function updateTabLabels() {
       const other = currentTable === 'EU' ? 'AM' : 'EU';
       const st = tables[other];
-      document.getElementById(currentTable === 'EU' ? 'tab-eu' : 'tab-am').innerText = TAB_TEXT[currentTable];
-      document.getElementById(other === 'EU' ? 'tab-eu' : 'tab-am').innerText =
-          `${TAB_TEXT[other]} · ${st.pause > 0 ? 'SPIN' : st.timeLeft + 's'}`;
+      const narrow = window.matchMedia('(max-width: 620px)').matches;
+      const name = t => (narrow ? TAB_TEXT_SHORT : TAB_TEXT)[t];
+      // 초는 두 자리로 맞춘다. 9s 와 30s 가 번갈아 나오면 글자 수가 달라져 폭이 흔들린다.
+      const tail = st.pause > 0 ? 'SPIN' : `${String(Math.max(0, st.timeLeft)).padStart(2, '0')}s`;
+
+      document.getElementById(currentTable === 'EU' ? 'tab-eu' : 'tab-am').innerText = name(currentTable);
+      document.getElementById(other === 'EU' ? 'tab-eu' : 'tab-am').innerText = `${name(other)} · ${tail}`;
   }
 
   function clearTableBets(table) {
