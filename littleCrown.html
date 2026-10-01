@@ -32,6 +32,11 @@
   .btn-shop:hover { transform: scale(1.05); filter: brightness(1.2); }
   @keyframes pulseShop { 0% { box-shadow: 0 0 10px #9b59b6; } 50% { box-shadow: 0 0 25px #e056fd; } 100% { box-shadow: 0 0 10px #9b59b6; } }
 
+  .bg-notice { display: none; max-width: 850px; margin: -6px 0 12px; padding: 7px 18px; border-radius: 18px;
+               background: rgba(41,128,185,0.18); border: 1px solid #3498db; color: #8ed0f5;
+               font-size: 0.9rem; font-weight: bold; text-align: center; }
+  .bg-notice.show { display: block; animation: nmbIn 0.25s ease-out; }
+
   .dealer-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; animation: glow 3s infinite alternate; }
   @keyframes glow { from { filter: drop-shadow(0 0 10px rgba(52, 152, 219, 0.4)); } to { filter: drop-shadow(0 0 20px rgba(52, 152, 219, 0.8)); } }
   
@@ -225,6 +230,8 @@
       </div>
       <button class="btn-shop" id="btnOpenShop">🛒 VIP SHOP</button>
   </div>
+
+  <div class="bg-notice" id="bgNotice"></div>
 
   <div class="dealer-section" title="이곳을 클릭하여 딜러 사진을 직접 등록하십시오.">
       <div class="dealer-avatar" id="dealerImg">
@@ -568,7 +575,24 @@
       }
   }
 
-  let currentTable = 'EU'; 
+  let currentTable = 'EU';
+
+  /* ═══════ 두 테이블 동시 진행 ═══════
+     지금 보고 있는 테이블은 기존 전역 변수(placedBets, totalBetAmount …)를 그대로 쓴다.
+     화면에 없는 테이블의 상태는 여기에 보관해 두고, 자체 타이머로 계속 돌린다.
+     활성 경로(애니메이션·칩·UI)는 손대지 않고 그대로 두는 게 핵심이다. */
+  const TABLE_LABEL = { EU: '유럽', AM: '아메리칸' };
+  const TAB_TEXT = { EU: 'European Table (Single 0)', AM: 'American Table (0 & 00)' };
+
+  const tables = {
+      EU: { placedBets: {}, betHistory: [], totalBetAmount: 0,
+            isRoundOver: false, needToPayForKeptBets: false, timeLeft: 30, pause: 0 },
+      AM: { placedBets: {}, betHistory: [], totalBetAmount: 0,
+            isRoundOver: false, needToPayForKeptBets: false, timeLeft: 15, pause: 0 }
+  };
+  let bgTimer = null;
+  let bgNoticeTimer = null;
+ 
   const redNumbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
   const wheelNumEU = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
   const wheelNumAM = ['00',27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2,0,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1];
@@ -733,18 +757,128 @@
   rtToggle.addEventListener('click', () => setRacetrackOpen(!rtEl.classList.contains('open')));
   buildRacetrack();
 
+  function bgNotice(text) {
+      const el = document.getElementById('bgNotice');
+      el.innerText = text; el.classList.add('show');
+      clearTimeout(bgNoticeTimer);
+      bgNoticeTimer = setTimeout(() => el.classList.remove('show'), 8000);
+  }
+
+  // 비활성 탭에 남은 시간을 띄워 "저쪽도 돌고 있다"는 걸 보이게 한다.
+  function updateTabLabels() {
+      const other = currentTable === 'EU' ? 'AM' : 'EU';
+      const st = tables[other];
+      document.getElementById(currentTable === 'EU' ? 'tab-eu' : 'tab-am').innerText = TAB_TEXT[currentTable];
+      document.getElementById(other === 'EU' ? 'tab-eu' : 'tab-am').innerText =
+          `${TAB_TEXT[other]} · ${st.pause > 0 ? 'SPIN' : st.timeLeft + 's'}`;
+  }
+
+  function clearTableBets(table) {
+      const st = tables[table];
+      for (const k in st.placedBets) st.placedBets[k].element.remove();
+      st.placedBets = {}; st.totalBetAmount = 0; st.betHistory = [];
+      st.needToPayForKeptBets = false;
+  }
+
+  function setChipsVisible(bets, visible) {
+      for (const k in bets) {
+          const el = bets[k].element;
+          if (el) el.style.display = visible ? 'flex' : 'none';
+      }
+  }
+
+  // 화면에 없는 테이블의 한 판. 애니메이션 없이 결과만 뽑아 즉시 정산한다.
+  function spinBackground(table) {
+      const st = tables[table];
+
+      // 활성 테이블의 handleKeptBets 와 같은 규칙으로 유지 베팅을 재결제한다.
+      if (st.isRoundOver) {
+          if (st.needToPayForKeptBets && balance >= st.totalBetAmount) {
+              balance -= st.totalBetAmount; st.needToPayForKeptBets = false;
+          } else {
+              clearTableBets(table);
+          }
+          st.isRoundOver = false;
+      }
+
+      const wheel = table === 'EU' ? wheelNumEU : wheelNumAM;
+      const winNum = wheel[Math.floor(Math.random() * wheel.length)];
+      const winnings = computeWinnings(st.placedBets, winNum);
+      balance += winnings;
+      recordResult(table, winNum);
+
+      const label = TABLE_LABEL[table];
+      if (st.totalBetAmount === 0)   bgNotice(`🔔 ${label} 테이블 결과: ${winNum}`);
+      else if (winnings > 0)         bgNotice(`🔔 ${label} 테이블 ${winNum} · $${winnings.toLocaleString()} 당첨!`);
+      else                           bgNotice(`🔔 ${label} 테이블 ${winNum} · 미적중 (-$${st.totalBetAmount.toLocaleString()})`);
+
+      const mode = document.querySelector('input[name="betMode"]:checked').value;
+      if (mode === '2' || (mode === '3' && winnings > 0)) { st.needToPayForKeptBets = true; st.betHistory = []; }
+      else { clearTableBets(table); }
+      st.isRoundOver = true;
+      updateUI();
+  }
+
+  function startBackgroundTimer(table) {
+      if (bgTimer) clearInterval(bgTimer);
+      updateTabLabels();
+      bgTimer = setInterval(() => {
+          const st = tables[table];
+          // 활성 테이블이 구슬 구르는 동안 타이머를 멈추므로, 뒷 테이블도 같은 시간만큼 쉬게 해
+          // 두 테이블의 간격이 유지되도록 한다.
+          if (st.pause > 0) { st.pause--; updateTabLabels(); return; }
+          st.timeLeft--;
+          if (st.timeLeft <= 0) {
+              spinBackground(table);
+              st.timeLeft = 30; st.pause = 9;
+          }
+          updateTabLabels();
+      }, 1000);
+  }
+
+  function saveActiveInto(table) {
+      const st = tables[table];
+      st.placedBets = placedBets; st.betHistory = betHistory; st.totalBetAmount = totalBetAmount;
+      st.isRoundOver = isRoundOver; st.needToPayForKeptBets = needToPayForKeptBets;
+      st.timeLeft = betTimeLeft; st.pause = 0;
+  }
+
+  function loadActiveFrom(table) {
+      const st = tables[table];
+      placedBets = st.placedBets; betHistory = st.betHistory; totalBetAmount = st.totalBetAmount;
+      isRoundOver = st.isRoundOver; needToPayForKeptBets = st.needToPayForKeptBets;
+      betTimeLeft = st.timeLeft;
+  }
+
   function switchTable(mode) {
       if (isSpinning) { msgBox.innerText = "스핀 중에는 이동 불가합니다."; return; }
-      if (currentTable === mode) return; 
-      if (totalBetAmount > 0 && !confirm("모든 칩을 회수하고 넘어갈까요?")) return; 
+      if (currentTable === mode) return;
+
+      // 칩은 회수하지 않는다. 떠나는 테이블은 상태를 보관하고 칩만 숨긴 뒤 뒤에서 계속 돌린다.
+      const from = currentTable;
+      if (autoTimer) clearInterval(autoTimer);
+      if (bgTimer) clearInterval(bgTimer);
+      saveActiveInto(from);
+      setChipsVisible(tables[from].placedBets, false);
+
       currentTable = mode;
+      loadActiveFrom(mode);
+      setChipsVisible(tables[mode].placedBets, true);
+
       document.getElementById('tab-eu').classList.toggle('active', mode === 'EU');
       document.getElementById('tab-am').classList.toggle('active', mode === 'AM');
-      
+
       applyDealerImage(mode);
       dealerNameEl.innerText = (mode === 'EU') ? "Virtual Dealer: MULBUM" : "Virtual Dealer: PENGUIN";
-      
-      clearAllBets(); buildBoard(); updateAnalyticsBoard(); drawWheelStatic(); updateRacetrackVisibility();
+
+      buildBoard(); updateAnalyticsBoard(); drawWheelStatic(); updateRacetrackVisibility(); updateUI();
+      startAutoTimer(true);          // 남은 시간을 이어서
+      startBackgroundTimer(from);
+
+      // 예전에는 전환할 때 칩을 회수했다. 이제는 그대로 두고 뒤에서 돌리므로 그 사실을 알린다.
+      if (tables[from].totalBetAmount > 0) {
+          bgNotice(`🔔 ${TABLE_LABEL[from]} 테이블의 베팅 $${tables[from].totalBetAmount.toLocaleString()} 은 그대로 진행됩니다.`);
+      }
   }
 
   function buildBoard() {
@@ -797,7 +931,7 @@
       } else {
           const x = e.offsetX; const y = e.offsetY; const w = e.target.clientWidth; const h = e.target.clientHeight; const rect = e.target.getBoundingClientRect();
           const c = Math.ceil(num / 3); const r = row; 
-          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
+          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
           let isUp = y < eY; let isDown = y > h - eY; let isLeft = x < eX; let isRight = x > w - eX;
           
           chipX = rect.left - boardRect.left + w / 2; 
@@ -975,7 +1109,7 @@
               else if (num === '00' && offsetY > h - edge) { targets = [0, '00']; chipY = rect.bottom - boardRect.top; }
           }
       } else {
-          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
+          const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
           let isUp = offsetY < eY; let isDown = offsetY > h - eY; let isLeft = offsetX < eX; let isRight = offsetX > w - eX;
           chipX = rect.left - boardRect.left + w / 2; chipY = rect.top - boardRect.top + h / 2;
           const c = Math.ceil(num / 3); const r = row;
@@ -1047,11 +1181,13 @@
       msgBox.innerText = `⏫ 모든 베팅을 2배로 올렸습니다. (총 $${totalBetAmount.toLocaleString()})`;
   });
 
-  function startAutoTimer() {
+  // keepTime 이 true 면 테이블을 옮겨와도 남은 시간을 이어서 센다.
+  function startAutoTimer(keepTime) {
       if(autoTimer) clearInterval(autoTimer);
-      betTimeLeft = 30; timerDisp.innerText = `00:30`;
+      if (!keepTime) betTimeLeft = 30;
+      timerDisp.innerText = `00:${String(Math.max(0, betTimeLeft)).padStart(2, '0')}`;
       autoTimer = setInterval(() => {
-          if (isSpinning) return; 
+          if (isSpinning) return;
           betTimeLeft--; timerDisp.innerText = `00:${betTimeLeft.toString().padStart(2, '0')}`;
           if (betTimeLeft <= 0) { clearInterval(autoTimer); autoSpinTrigger(); }
       }, 1000);
@@ -1188,12 +1324,13 @@
   }
 
   // 💡 수정됨: 스핀 결과 처리 시 관전 모드 메시지 분기
-  const HISTORY_MAX = 300;   // 테이블당 보관할 최근 스핀 결과 개수
-
-  function calculatePayout(winNum) {
+  const HISTORY_MAX = 300;   // 테이블당 보관할 최근 스핀 결과 개수
+
+  // 두 테이블이 같은 계산을 쓰도록 떼어냈다. 여기 말고 다른 곳에 배당을 적지 않는다.
+  function computeWinnings(bets, winNum) {
       let winnings = 0;
-      for (let key in placedBets) {
-          let amt = placedBets[key].amount; let ratio = 0; let targets = placedBets[key].targets;
+      for (let key in bets) {
+          let amt = bets[key].amount; let ratio = 0; let targets = bets[key].targets;
           let isNumberBet = targets.every(t => !isNaN(t) || t === '00');
           if (isNumberBet) {
               if (targets.map(String).includes(String(winNum))) { ratio = 36 / targets.length; if (targets.length === 5) ratio = 7; }
@@ -1210,13 +1347,25 @@
           }
           if (ratio > 0) winnings += amt * ratio;
       }
+      return winnings;
+  }
+
+  // 스핀 결과를 해당 테이블의 기록·빈도에 남긴다.
+  function recordResult(table, winNum) {
+      const histArr = table === 'EU' ? historyEU : historyAM;
+      const freqObj = table === 'EU' ? freqEU : freqAM;
+      histArr.push(winNum); freqObj[winNum]++;
+      // 화면에는 최근 20개만 쓰지만 기록은 계속 쌓인다. localStorage가 무한히 커지지 않게 잘라낸다.
+      if (histArr.length > HISTORY_MAX) histArr.splice(0, histArr.length - HISTORY_MAX);
+      saveHistory();
+  }
+
+  function calculatePayout(winNum) {
+      const winnings = computeWinnings(placedBets, winNum);
       balance += winnings; updateUI();
-      
-      let histArr = currentTable === 'EU' ? historyEU : historyAM; let freqObj = currentTable === 'EU' ? freqEU : freqAM;
-      histArr.push(winNum); freqObj[winNum]++;
-      // 화면에는 최근 20개만 쓰지만 기록은 계속 쌓인다. localStorage가 무한히 커지지 않게 잘라낸다.
-      if (histArr.length > HISTORY_MAX) histArr.splice(0, histArr.length - HISTORY_MAX);
-      saveHistory(); updateAnalyticsBoard();
+
+      recordResult(currentTable, winNum);
+      updateAnalyticsBoard();
 
       if (totalBetAmount === 0) { 
           msgBox.innerText = `결과: ${winNum} - (관전 스핀) 다음 판에 배팅해 보세요!`; 
@@ -1460,7 +1609,9 @@
       document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
   }
 
-  applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); startAutoTimer();
+  applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard();
+  startAutoTimer();                 // 유럽: 30초부터
+  startBackgroundTimer('AM');       // 아메리칸: 15초부터 (어긋나게)
 
 })();
 </script>
