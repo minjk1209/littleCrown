@@ -65,11 +65,11 @@
   .deck-title { width: 100%; color: #FFD700; font-weight: bold; letter-spacing: 1px; font-size: clamp(0.95rem, 2.4vw, 1.1rem); margin-bottom: 12px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 7px; }
   /* 기본 라디오 대신 선택형 버튼 3개. 라디오는 숨기되 그대로 두어
      input[name="betMode"]:checked 를 읽는 정산 코드는 건드리지 않는다. */
-  .deck-options { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 320px; margin: 0 auto; }
+  .deck-options { display: grid; grid-template-columns: 1fr; gap: 6px; width: 100%; max-width: 320px; margin: 0 auto; }
   .deck-opt { cursor: pointer; display: block; min-width: 0; }
   .deck-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
   .deck-opt span { display: flex; align-items: center; justify-content: center; text-align: center;
-                   min-height: 40px; padding: 8px 10px; border-radius: 8px;
+                   min-height: 32px; padding: 5px 10px; border-radius: 7px;
                    border: 2px solid #3d6b45; background: rgba(0,0,0,0.3); color: #9fd8ab;
                    font-weight: bold; font-size: clamp(0.7rem, 1.6vw, 0.95rem); line-height: 1.25;
                    transition: 0.2s; }
@@ -1001,6 +1001,10 @@
   // 어느 지점을 눌러도 둘 다 참이 되어 단일 숫자 베팅이 아예 불가능해진다.
   // 칸 너비에 비례시켜 어떤 화면에서도 같은 비율을 유지한다. (50 * 0.36 = 18)
   const EDGE_RATIO = 0.36;
+  /* 1번 열(1·2·3)의 왼쪽은 0 과 묶이는 구역이다. 다른 가장자리와 달리
+     여기만 들어가면 0 이 끼어들어 베팅 성격이 완전히 달라지므로 더 좁게 잡는다.
+     (0.36 이면 칸의 1/3 이 넘어 1·2 를 평범하게 눌러도 0 이 섞였다) */
+  const ZERO_EDGE_RATIO = 0.18;
 
   function handleInsideBet(e, num, isZeroArea, row, col) {
       if (isSpinning) return; handleKeptBets();
@@ -1023,6 +1027,7 @@
           const c = Math.ceil(num / 3); const r = row; 
           const eX = w * EDGE_RATIO, eY = h * EDGE_RATIO;
           let isUp = y < eY; let isDown = y > h - eY; let isLeft = x < eX; let isRight = x > w - eX;
+          if (c === 1) isLeft = x < w * ZERO_EDGE_RATIO;   // 0 조합 구역만 좁게
           
           chipX = rect.left - boardRect.left + w / 2; 
           chipY = rect.top - boardRect.top + h / 2;
@@ -1221,6 +1226,7 @@
           let isUp = offsetY < eY; let isDown = offsetY > h - eY; let isLeft = offsetX < eX; let isRight = offsetX > w - eX;
           chipX = rect.left - boardRect.left + w / 2; chipY = rect.top - boardRect.top + h / 2;
           const c = Math.ceil(num / 3); const r = row;
+          if (c === 1) isLeft = offsetX < w * ZERO_EDGE_RATIO;   // 0 조합 구역만 좁게
           if (isLeft && c === 1) { 
               if (currentTable === 'EU') {
                   if ((r === 2 && isUp) || (r === 1 && isDown)) targets = [0, 2, 3]; else if ((r === 2 && isDown) || (r === 3 && isUp)) targets = [0, 1, 2];
