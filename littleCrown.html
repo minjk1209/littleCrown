@@ -74,12 +74,15 @@
   .stat-box { font-size: 1rem; width: 100%; text-align: center; } 
   .stat-hot { color: #e74c3c; font-weight: bold; } .stat-cold { color: #3498db; font-weight: bold; }
 
-  .vault-panel { background: linear-gradient(145deg, #434343, #1c1c1c); border: 4px solid #5a6268; border-radius: 12px; box-shadow: inset 0px 0px 20px rgba(0,0,0,1), 5px 5px 15px rgba(0,0,0,0.8); flex-direction: column; gap: 8px; width: 100%; justify-content: center; position: relative; padding: 15px 20px; }
+  .vault-panel { background: linear-gradient(145deg, #434343, #1c1c1c); border: 4px solid #5a6268; border-radius: 12px; box-shadow: inset 0px 0px 20px rgba(0,0,0,1), 5px 5px 15px rgba(0,0,0,0.8); flex-direction: column; gap: 8px; width: 100%; justify-content: center; position: relative; padding: 14px 12px; }
   .vault-title { color: #bdc3c7; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #5a6268; padding-bottom: 5px; text-align: center; }
   .vault-balance { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #2ecc71; font-size: clamp(0.95rem, 3.2vw, 1.6rem); background: #0a0a0a; padding: 8px 10px; border-radius: 5px; border: 2px inset #222; text-align: center; text-shadow: 0 0 5px #2ecc71; white-space: nowrap; overflow: hidden; }
   .vault-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-  .vault-btn-group { display: flex; gap: 8px; width: 100%; }
-  .btn-vault { background: linear-gradient(to bottom, #7f8c8d, #34495e); color: white; border: 2px solid #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.85rem; flex: 1; white-space: nowrap; }
+  /* flex:1 은 min-width:auto 라 글자가 긴 버튼이 더 넓어진다. 그리드로 정확히 반반씩 나눈다. */
+  .vault-btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .btn-vault { background: linear-gradient(to bottom, #7f8c8d, #34495e); color: white; border: 2px solid #2c3e50; padding: 6px 4px; border-radius: 5px;
+               font-weight: bold; cursor: pointer; font-size: clamp(0.72rem, 2.4vw, 0.85rem); white-space: nowrap;
+               display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 34px; line-height: 1; overflow: hidden; }
   .btn-vault:active:not(:disabled) { transform: translateY(2px); }
   
   .player-title-display { background: rgba(255,215,0,0.2); border: 1px solid #FFD700; color: #FFD700; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px; }
@@ -139,8 +142,12 @@
   .btn-sys.recharge:disabled { background: #2c3e50; color: #7f8c8d; border-color: #34495e; cursor: not-allowed; transform: none; }
   
   .controls { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; max-width: 850px; } 
-  .chip-selector { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .chip { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; cursor: pointer; border: 3px dashed rgba(255,255,255,0.3); box-shadow: 2px 2px 5px rgba(0,0,0,0.5); transition: transform 0.2s; } 
+  /* 선택된 칩이 1.15배로 커지므로 그만큼 간격을 둬야 옆 칩과 겹치지 않는다. */
+  .chip-selector { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; padding: 4px 0; }
+  .chip { flex: none; width: clamp(38px, 10.5vw, 46px); height: clamp(38px, 10.5vw, 46px); border-radius: 50%;
+          display: flex; align-items: center; justify-content: center; font-weight: bold;
+          font-size: clamp(0.6rem, 2.1vw, 0.8rem); line-height: 1; white-space: nowrap; cursor: pointer;
+          border: 3px dashed rgba(255,255,255,0.3); box-shadow: 2px 2px 5px rgba(0,0,0,0.5); transition: transform 0.2s; } 
   .chip.active { transform: scale(1.15); border: 3px solid #FFD700; box-shadow: 0 0 15px #FFD700; z-index: 5; }
   .chip-10 { background: #3498db; } .chip-25 { background: #2ecc71; } .chip-50 { background: #9b59b6; } .chip-100 { background: #1abc9c; } .chip-500 { background: #e67e22; } .chip-1000 { background: #e74c3c; } .chip-5000 { background: #f1c40f; color: black; } .chip-10000 { background: #bdc3c7; color: black; }
   .chip-100k { background: #2c3e50; border-color: #7f8c8d; }
