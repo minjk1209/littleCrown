@@ -132,6 +132,21 @@
   .chip-1m { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%); color: black; border-color: #e84393; }
   .chip-10m { background: linear-gradient(135deg, #000 0%, #434343 100%); color: #FFD700; border: 3px solid #FFD700; box-shadow: inset 0 0 10px #FFD700; }
   
+  /* 스핀 중 베팅판을 덮는 마감 표시. 베팅 차단은 isSpinning 가드가 이미 하고 있어
+     여기서는 클릭을 가로채지 않는다(pointer-events: none). */
+  .no-more-bets { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 300;
+                  display: none; flex-direction: column; align-items: center; justify-content: center;
+                  background: rgba(0,0,0,0.55); pointer-events: none; }
+  .no-more-bets.show { display: flex; animation: nmbIn 0.25s ease-out; }
+  .no-more-bets span { font-size: clamp(15px, 5vw, 44px); font-weight: 900; white-space: nowrap;
+                       letter-spacing: clamp(1px, 0.6vw, 5px); color: #e74c3c;
+                       text-shadow: 0 0 14px rgba(231,76,60,0.9), 0 2px 4px #000;
+                       animation: nmbPulse 1.1s ease-in-out infinite; }
+  .no-more-bets small { margin-top: 6px; font-weight: bold; letter-spacing: 2px; color: #D4AF37;
+                        font-size: clamp(9px, 2.2vw, 15px); }
+  @keyframes nmbIn { from { opacity: 0; transform: scale(1.15); } to { opacity: 1; transform: scale(1); } }
+  @keyframes nmbPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
   .placed-chip { position: absolute; width: calc(var(--cell) * 0.64); height: calc(var(--cell) * 0.64); touch-action: none; border-radius: 50%; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="gold" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="30" fill="white" stroke="black" stroke-width="2"/></svg>') center/cover; display: flex; align-items: center; justify-content: center; color: black; font-size: calc(var(--cell) * 0.2); font-weight: bold; z-index: 100; text-shadow: 0 0 2px white; transform: translate(-50%, -50%); cursor: grab; }
   .placed-chip:active { cursor: grabbing; }
   
@@ -270,6 +285,7 @@
       </div>
       <div class="outside-bets-1"><div class="spacer"></div><div class="out-cell" data-bet="1st12">1st 12</div><div class="out-cell" data-bet="2nd12">2nd 12</div><div class="out-cell" data-bet="3rd12">3rd 12</div><div class="spacer"></div></div>
       <div class="outside-bets-2"><div class="spacer"></div><div class="out-cell" data-bet="1-18">1 to 18</div><div class="out-cell" data-bet="even">EVEN</div><div class="out-cell red" data-bet="red" style="background:#c0392b;">RED</div><div class="out-cell black" data-bet="black" style="background:#1a1a1a;">BLACK</div><div class="out-cell" data-bet="odd">ODD</div><div class="out-cell" data-bet="19-36">19 to 36</div><div class="spacer"></div></div>
+      <div class="no-more-bets" id="noMoreBets"><span>NO MORE BETS</span><small>베팅 마감</small></div>
     </div>
   </div>
 
@@ -1086,8 +1102,11 @@
   }
 
   // 💡 수정됨: 스핀 시작 시 관전 모드 메시지 분기
+  const noMoreBetsEl = document.getElementById('noMoreBets');
+
   function startSpinning() {
       isSpinning = true; timerDisp.innerText = "SPIN!";
+      noMoreBetsEl.classList.add('show');
       if (totalBetAmount === 0) {
           msgBox.innerText = "관전 모드입니다. 구슬이 굴러갑니다...";
       } else {
@@ -1119,7 +1138,11 @@
       rotate();
   }
 
-  function finishSpin(winNum) { isSpinning = false; calculatePayout(winNum); startAutoTimer(); }
+  function finishSpin(winNum) {
+      isSpinning = false;
+      noMoreBetsEl.classList.remove('show');
+      calculatePayout(winNum); startAutoTimer();
+  }
 
   function triggerSpecialEffect() {
       let ef = equipped.effects;
