@@ -157,19 +157,17 @@
   /* stroke-width 는 viewBox 단위라 화면이 좁아지면 선도 같이 얇아진다.
      폰에서는 1픽셀 미만이 되어 반투명 회색으로 뭉개지며 전체가 흐릿해 보인다.
      non-scaling-stroke 로 화면 픽셀 기준으로 고정한다. */
-  /* 폰에서는 칸 하나가 24x22px 남짓이라 흰 테두리가 칸 면적의 20% 를 차지하며
-     색을 희석했다. 유럽 휠은 빨강/검정이 완전히 번갈아 나오므로(0만 초록)
-     옆 칸과 늘 색이 달라, 테두리를 어둡게 해도 구분이 유지된다.
-     흰색 대신 검정을 쓰면 희석 대신 가장자리가 더 가라앉아 색이 깊어 보인다. */
-  .rt-cell { cursor: pointer; stroke: rgba(0,0,0,0.65); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
-  .rt-cell.red { fill: #8f1109; } .rt-cell.black { fill: #000; } .rt-cell.zero { fill: #0e5c28; }
+  /* stroke-width 는 viewBox 단위라 화면이 좁아지면 선도 같이 얇아진다.
+     폰에서는 1픽셀 미만이 되어 뭉개지므로 non-scaling-stroke 로 화면 기준 고정. */
+  .rt-cell { cursor: pointer; stroke: rgba(255,255,255,0.72); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .rt-cell.red { fill: #ad1f16; } .rt-cell.black { fill: #0d0d0d; } .rt-cell.zero { fill: #15803d; }
   .rt-cell:active { fill: #D4AF37; }
-  .rt-cell-t { fill: #fff; font-weight: bold; font-size: 26px; text-anchor: middle;
+  .rt-cell-t { fill: #fff; font-weight: bold; font-size: 25px; text-anchor: middle;
                dominant-baseline: central; pointer-events: none; }
   .rt-cell.bet { stroke: #FFD700; stroke-width: 2.6; vector-effect: non-scaling-stroke; }
 
-  .rt-band { cursor: pointer; fill: rgba(0,0,0,0.85); stroke: #D4AF37; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
-  .rt-band:active { fill: rgba(212,175,55,0.5); }
+  .rt-band { cursor: pointer; fill: rgba(0,0,0,0.72); stroke: #D4AF37; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+  .rt-band:active { fill: rgba(212,175,55,0.45); }
   .rt-band-t { fill: #FFD700; font-weight: bold; font-size: 23px; letter-spacing: 1.5px;
                text-anchor: middle; dominant-baseline: central; pointer-events: none; }
   .rt-band-s { fill: #cfcfcf; font-size: 15px; text-anchor: middle;
@@ -255,17 +253,6 @@
                        border-radius: 50%; background: #111; border: 3px solid #ccc; }
   .mw-label { color: #D4AF37; font-size: clamp(9px, 2vw, 12px); font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; }
   .mw-result { color: #fff; font-size: clamp(11px, 2.6vw, 16px); font-weight: bold; margin-top: 5px; min-height: 1.2em; }
-
-  /* ── 진단용 : 같은 색을 CSS 배경 / 큰 SVG / 레이스트랙 칸 크기 SVG 로 나란히 보여준다.
-     어느 줄이 연해 보이는지로 원인을 가린다. 확인 뒤 제거한다. ── */
-  .diag { display: none; width: 100%; max-width: 850px; margin-bottom: 15px; padding: 10px 12px;
-          box-sizing: border-box; background: #15402a; border: 2px dashed #D4AF37; border-radius: 10px; }
-  .diag.open { display: block; }
-  .diag h4 { margin: 0 0 8px; color: #FFD700; font-size: 0.85rem; letter-spacing: 1px; }
-  .diag-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
-  .diag-lbl { width: 108px; flex: none; color: #cfcfcf; font-size: 0.72rem; font-weight: bold; }
-  .diag-sw { width: 62px; height: 40px; border-radius: 3px; }
-  .diag-note { color: #8ed0f5; font-size: 0.7rem; margin-top: 6px; line-height: 1.5; }
 
   .ver-badge { position: fixed; left: 6px; bottom: 6px; z-index: 950; padding: 3px 8px; border-radius: 10px;
                background: rgba(0,0,0,0.6); color: #7f8c8d; font-size: 11px; font-weight: bold;
@@ -403,7 +390,6 @@
   </div>
 
   <div class="racetrack" id="racetrack"></div>
-  <div class="diag" id="diagPanel"></div>
 
   <div class="panel-base system-panel">
     <div class="balance-group">
@@ -988,7 +974,6 @@
       const onTrack = view === 'track';
       boardWrapEl.classList.toggle('offstage', onTrack);
       rtEl.classList.toggle('open', onTrack);
-      document.getElementById('diagPanel').classList.toggle('open', onTrack);   // 진단용
       viewBoardBtn.classList.toggle('active', !onTrack);
       viewTrackBtn.classList.toggle('active', onTrack);
   }
@@ -1000,38 +985,6 @@
       viewTrackBtn.title = isEU ? '' : '콜 벳은 유럽 테이블에서만 가능합니다';
       setView(isEU ? currentView : 'board');
   }
-
-  /* 진단용. 같은 색을 세 가지 방식으로 그려 비교한다.
-     ① CSS 배경  ② 큰 SVG 사각형  ③ 실제 레이스트랙 칸과 같은 크기의 SVG + 흰 숫자
-     ③만 연해 보이면 작은 크기에서의 안티에일리어싱·흰 글자 때문이고,
-     ②③ 모두 연하면 SVG 렌더링 문제, 전부 같으면 색은 정상이다. */
-  function buildDiagPanel() {
-      const COLORS = [['#8f1109', '32'], ['#000000', '15'], ['#0e5c28', '0']];
-      const d = document.getElementById('diagPanel');
-      const rows = [];
-
-      let r = '<div class="diag-row"><div class="diag-lbl">① CSS 배경</div>';
-      COLORS.forEach(([c]) => r += `<div class="diag-sw" style="background:${c}"></div>`);
-      rows.push(r + '</div>');
-
-      r = '<div class="diag-row"><div class="diag-lbl">② SVG 큰 칸</div>';
-      COLORS.forEach(([c]) => r +=
-          `<svg width="62" height="40" viewBox="0 0 62 40"><rect width="62" height="40" fill="${c}"/></svg>`);
-      rows.push(r + '</div>');
-
-      // 실제 레이스트랙 칸 비율(뷰박스 66x62)을 화면 24x22 로 축소한 것과 같은 조건
-      r = '<div class="diag-row"><div class="diag-lbl">③ SVG 실제 칸</div>';
-      COLORS.forEach(([c, n]) => r +=
-          `<svg width="62" height="40" viewBox="0 0 170 110">` +
-          `<rect width="170" height="110" fill="${c}" stroke="rgba(0,0,0,0.65)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>` +
-          `<text x="85" y="55" fill="#fff" font-weight="bold" font-size="66" text-anchor="middle" dominant-baseline="central">${n}</text></svg>`);
-      rows.push(r + '</div>');
-
-      d.innerHTML = '<h4>🔍 진단용 색 비교 (확인 뒤 제거합니다)</h4>' + rows.join('') +
-          '<div class="diag-note">세 줄의 빨강·검정·초록이 서로 같은 색으로 보이나요?<br>' +
-          '어느 줄이 연해 보이는지 알려주세요. ①②③ 전부 같으면 색은 정상입니다.</div>';
-  }
-  buildDiagPanel();
 
   viewBoardBtn.addEventListener('click', () => setView('board'));
   viewTrackBtn.addEventListener('click', () => setView('track'));
@@ -2004,7 +1957,7 @@
       document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
   }
 
-  const APP_VERSION = 'v37';   // sw.js 의 CACHE 버전과 함께 올린다
+  const APP_VERSION = 'v38';   // sw.js 의 CACHE 버전과 함께 올린다
   document.getElementById('verBadge').innerText = APP_VERSION;
 
   applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); updateRacetrackVisibility();
