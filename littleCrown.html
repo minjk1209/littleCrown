@@ -158,18 +158,22 @@
        TIERS     윗줄 11~17 아랫줄 15~18  -> 폭 0.32   (0 반대편)
      위/아래 줄의 칸 수가 17 대 18 이라 경계가 미세하게 어긋난다. 두 값의 평균으로 잡았다.
      실제 테이블도 타원이라 경계가 곡선이어서 딱 떨어지지 않는다. */
-  .rt-sectors { display: grid; grid-template-columns: 46fr 23fr 31fr; gap: 4px; padding: 7px 4px 3px; }
-  /* JEU 0 은 0 양옆 일곱 칸만 덮는 작은 베팅이라 왼쪽 끝에 짧게 둔다. */
-  .rt-zerorow { display: grid; grid-template-columns: 19fr 81fr; gap: 4px; padding: 0 4px 7px; }
-  .rt-sec { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-            min-width: 0; min-height: 38px; padding: 6px 4px; border-radius: 5px;
-            background: rgba(0,0,0,0.45); border: 1px solid #D4AF37; color: #FFD700;
-            font-weight: bold; line-height: 1.15; cursor: pointer; transition: 0.15s; }
-  .rt-sec:active { background: rgba(212,175,55,0.3); }
-  .rt-sec-t { max-width: 100%; font-size: clamp(8px, 1.9vw, 13px); letter-spacing: 0.5px;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rt-sec small { max-width: 100%; color: #aaa; font-weight: normal; white-space: nowrap;
-                  overflow: hidden; text-overflow: ellipsis; font-size: clamp(7px, 1.5vw, 10px); }
+  /* 구역 경계는 윗줄과 아랫줄에서 서로 다른 자리에 떨어진다.
+     예) VOISINS 는 윗줄 41.2% 에서, 아랫줄 50.0% 에서 끝난다.
+     실제 레이스트랙은 타원이라 이 경계선이 비스듬하게 그어진다.
+     네모로 그리면 한쪽 줄에만 맞아 어긋나 보이므로 사다리꼴로 자른다. */
+  .rt-sectors { position: relative; height: clamp(38px, 8.5vw, 50px); margin: 5px 0 3px; }
+  .rt-zerorow { position: relative; height: clamp(20px, 4.6vw, 26px); margin-bottom: 5px; }
+  .rt-sec { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: none; padding: 0; background: rgba(0,0,0,0.5); color: #FFD700;
+            font-weight: bold; cursor: pointer; transition: background 0.15s; }
+  .rt-sec:active { background: rgba(212,175,55,0.38); }
+  /* 라벨은 사다리꼴의 가로 중앙에 둔다 (JS 가 left 를 계산해서 넣는다) */
+  .rt-sec-in { position: absolute; top: 50%; transform: translate(-50%, -50%);
+               display: flex; flex-direction: column; align-items: center; gap: 1px;
+               white-space: nowrap; pointer-events: none; line-height: 1.1; }
+  .rt-sec-t { font-size: clamp(7px, 1.7vw, 13px); letter-spacing: 0.5px; }
+  .rt-sec small { color: #aaa; font-weight: normal; font-size: clamp(6px, 1.3vw, 10px); }
 
   /* 잔액은 왼쪽, 버튼 묶음은 오른쪽. space-around 로 5개를 흩뿌리면 간격이 들쭉날쭉해진다. */
   /* 잔액 -> Undo/Double/Clear 한 줄 -> 충전 한 줄, 위에서 아래로 쌓는다. */
@@ -806,11 +810,25 @@
           return r;
       }
 
+      /* 각 구역이 윗줄·아랫줄에서 차지하는 구간(%). 휠 순서로 계산한 값이다.
+         윗줄 17칸, 아랫줄 18칸이라 같은 구역이라도 끝나는 위치가 다르다.
+         경계선 사이에 0.3% 씩 틈을 둬서 그 사이로 테이블 녹색이 비치게 했다. */
+      const SECTOR_SHAPE = {
+          voisins:   { t0: 0,    t1: 40.9, b0: 0,    b1: 49.7 },   // 윗줄 1~7   아랫줄 1~9
+          orphelins: { t0: 41.5, t1: 58.5, b0: 50.3, b1: 77.5 },   // 윗줄 8~10  아랫줄 10~14
+          tiers:     { t0: 59.1, t1: 100,  b0: 78.1, b1: 100  },   // 윗줄 11~17 아랫줄 15~18
+          zero:      { t0: 0,    t1: 11.3, b0: 0,    b1: 21.8 }    // 윗줄 1~2   아랫줄 1~4
+      };
+
       function sectorBtn(key, label, sub) {
+          const sh = SECTOR_SHAPE[key];
           const b = document.createElement('button');
           b.className = 'rt-sec';
-          b.innerHTML = `<span class="rt-sec-t">${label}</span><small>${sub}</small>`;
-          b.title = `${CALL_BETS[key].name} · 숫자 ${sub}`;
+          b.style.clipPath = `polygon(${sh.t0}% 0%, ${sh.t1}% 0%, ${sh.b1}% 100%, ${sh.b0}% 100%)`;
+          const cx = (sh.t0 + sh.t1 + sh.b0 + sh.b1) / 4;      // 사다리꼴의 가로 중앙
+          b.innerHTML = `<span class="rt-sec-in" style="left:${cx.toFixed(1)}%">` +
+                        `<span class="rt-sec-t">${label}</span><small>${sub}</small></span>`;
+          b.title = `${CALL_BETS[key].name} · ${sub}`;
           b.addEventListener('click', () => placeCallBet(key));
           return b;
       }
@@ -821,9 +839,9 @@
        ['orphelins', 'ORPHELINS', '8 · 5칩'],
        ['tiers', 'TIERS', '12 · 6칩']].forEach(([k, l, sub]) => sectors.appendChild(sectorBtn(k, l, sub)));
 
+      // JEU 0 은 VOISINS 안쪽에 겹치는 구간이라 같은 층에 두면 서로를 가린다. 아래 줄로 분리.
       const zeroRow = document.createElement('div'); zeroRow.className = 'rt-zerorow';
       zeroRow.appendChild(sectorBtn('zero', 'JEU 0', '7 · 4칩'));
-      zeroRow.appendChild(document.createElement('div'));   // 오른쪽은 비워 둔다
 
       const mid = document.createElement('div'); mid.className = 'rt-mid';
       mid.appendChild(row(top)); mid.appendChild(sectors); mid.appendChild(zeroRow); mid.appendChild(row(bottom));
