@@ -1743,15 +1743,54 @@
       if (!isNaN(amt) && amt > 0 && amt <= vaultBalance) { vaultBalance -= amt; balance += amt; updateUI(); }
   });
   
-  document.getElementById('btnIssueVoucher').addEventListener('click', () => {
-      let amt = parseInt(prompt("수표 발행 금액:"));
-      if (!isNaN(amt) && amt > 0 && amt <= balance) { 
-          balance -= amt; 
-          let rand = Math.random().toString(36).substr(2, 6).toUpperCase();
-          let checksum = btoa(amt + "CASINO" + rand).replace(/=/g, '').substr(0, 6).toUpperCase();
-          let code = `SEC-${amt}-${rand}-${checksum}`;
-          updateUI(); 
-          alert(`바우처 코드: ${code}`); 
+  /* 클립보드 API 는 HTTPS 에서만 동작하고 권한이 막힐 수도 있다.
+     실패하면 화면 밖 textarea + execCommand 로 한 번 더 시도한다. */
+  async function copyToClipboard(text) {
+      try {
+          if (navigator.clipboard && window.isSecureContext) {
+              await navigator.clipboard.writeText(text);
+              return true;
+          }
+      } catch (e) { /* 아래로 */ }
+      try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed'; ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select(); ta.setSelectionRange(0, text.length);
+          const ok = document.execCommand('copy');
+          ta.remove();
+          return ok;
+      } catch (e) { return false; }
+  }
+
+  document.getElementById('btnIssueVoucher').addEventListener('click', async () => {
+      const input = prompt("수표 발행 금액:");
+      if (input === null) return;
+      const amt = parseInt(input);
+      if (isNaN(amt) || amt <= 0) { msgBox.innerText = "발행 금액이 올바르지 않습니다."; return; }
+      if (amt > balance) { msgBox.innerText = `잔고가 부족합니다. (지갑: $${balance.toLocaleString()})`; return; }
+
+      balance -= amt;
+      const rand = Math.random().toString(36).substr(2, 6).toUpperCase();
+      const checksum = btoa(amt + "CASINO" + rand).replace(/=/g, '').substr(0, 6).toUpperCase();
+      const code = `SEC-${amt}-${rand}-${checksum}`;
+      updateUI();
+
+      const copied = await copyToClipboard(code);
+      if (copied) {
+          msgBox.innerText = `🧾 수표 $${amt.toLocaleString()} 발행 · 코드를 클립보드에 복사했습니다.`;
+          alert(`🧾 수표가 발행되었습니다.
+
+${code}
+
+📋 코드를 클립보드에 복사했습니다.
+어디든 붙여넣어 보관하세요.`);
+      } else {
+          // alert 안의 글자는 선택이 안 된다. prompt 는 선택·복사가 된다.
+          msgBox.innerText = `🧾 수표 $${amt.toLocaleString()} 발행 · 아래 코드를 복사해 두세요.`;
+          prompt("🧾 수표 코드입니다. 길게 눌러(또는 Ctrl+C) 복사하세요.", code);
       }
   });
   
@@ -1957,7 +1996,7 @@
       document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
   }
 
-  const APP_VERSION = 'v38';   // sw.js 의 CACHE 버전과 함께 올린다
+  const APP_VERSION = 'v39';   // sw.js 의 CACHE 버전과 함께 올린다
   document.getElementById('verBadge').innerText = APP_VERSION;
 
   applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); updateRacetrackVisibility();
