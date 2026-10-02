@@ -152,9 +152,11 @@
   /* stroke-width 는 viewBox 단위라 화면이 좁아지면 선도 같이 얇아진다.
      폰에서는 1픽셀 미만이 되어 반투명 회색으로 뭉개지며 전체가 흐릿해 보인다.
      non-scaling-stroke 로 화면 픽셀 기준으로 고정한다. */
-  /* 폰에서는 칸 하나가 24x22px 남짓이라, 밝고 굵은 테두리가 칸 면적의 20% 넘게
-     차지하면서 빨강은 연해지고 검정은 회색처럼 떴다. 테두리를 얇고 어둡게 낮춘다. */
-  .rt-cell { cursor: pointer; stroke: rgba(255,255,255,0.5); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+  /* 폰에서는 칸 하나가 24x22px 남짓이라 흰 테두리가 칸 면적의 20% 를 차지하며
+     색을 희석했다. 유럽 휠은 빨강/검정이 완전히 번갈아 나오므로(0만 초록)
+     옆 칸과 늘 색이 달라, 테두리를 어둡게 해도 구분이 유지된다.
+     흰색 대신 검정을 쓰면 희석 대신 가장자리가 더 가라앉아 색이 깊어 보인다. */
+  .rt-cell { cursor: pointer; stroke: rgba(0,0,0,0.65); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
   .rt-cell.red { fill: #8f1109; } .rt-cell.black { fill: #000; } .rt-cell.zero { fill: #0e5c28; }
   .rt-cell:active { fill: #D4AF37; }
   .rt-cell-t { fill: #fff; font-weight: bold; font-size: 26px; text-anchor: middle;
