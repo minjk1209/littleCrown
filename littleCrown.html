@@ -134,46 +134,33 @@
      getBoundingClientRect 가 전부 0 이 되어 콜 벳 칩이 엉뚱한 자리에 놓인다.
      칩 좌표는 보드 기준 상대값이라 밖으로 밀어내도 계산은 그대로 맞는다. */
   .board-wrapper.offstage { position: absolute; left: -99999px; top: 0; }
-  .racetrack { position: relative; display: none; width: 100%; max-width: 850px; margin-bottom: 15px; padding: 6px; box-sizing: border-box;
-               background: #1e5631; border: 5px solid #4a3b2c; border-radius: 70px; box-shadow: inset 0 0 30px rgba(0,0,0,0.6); }
+  /* ───── 레이스트랙 : 진짜 타원을 SVG 로 그린다 ─────
+     div 를 늘어놓아 타원 흉내를 내면 양 끝이 곡선이 아니고 칸이 휘지 않아
+     어떤 값을 넣어도 어색하다. 둘레를 37등분해 호를 직접 계산한다. */
+  .racetrack { position: relative; display: none; width: 100%; max-width: 850px; margin-bottom: 15px;
+               padding: 10px; box-sizing: border-box; background: #1e5631; border: 5px solid #4a3b2c;
+               border-radius: 18px; box-shadow: inset 0 0 30px rgba(0,0,0,0.6); }
+  .racetrack.open { display: block; }
+  .racetrack svg { display: block; width: 100%; height: auto; }
   .racetrack.locked::after { content: 'NO MORE BETS'; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-                             display: flex; align-items: center; justify-content: center; border-radius: 65px;
+                             display: flex; align-items: center; justify-content: center; border-radius: 14px;
                              background: rgba(0,0,0,0.6); color: #e74c3c; font-weight: 900;
                              font-size: clamp(12px, 3.2vw, 28px); letter-spacing: clamp(1px, 0.5vw, 4px);
                              text-shadow: 0 0 12px rgba(231,76,60,0.9), 0 2px 4px #000;
                              pointer-events: none; animation: nmbPulse 1.1s ease-in-out infinite; }
-  .racetrack.open { display: flex; }
-  .rt-end { flex: none; width: clamp(30px, 8vw, 46px); display: flex; }
-  .rt-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .rt-row { display: flex; }
-  .rt-num { flex: 1 1 0; min-width: 0; height: clamp(22px, 5.5vw, 30px); display: flex; align-items: center; justify-content: center;
-            font-size: clamp(7px, 1.8vw, 13px); font-weight: bold; color: #fff; border: 1px solid rgba(255,255,255,0.4);
-            cursor: pointer; box-sizing: border-box; overflow: hidden; white-space: nowrap; line-height: 1; }
-  .rt-num.red { background: #c0392b; } .rt-num.black { background: #1a1a1a; } .rt-num.zero { background: #27ae60; }
-  .rt-end .rt-num { height: auto; border-radius: 60px; }
-  /* 실제 레이스트랙처럼 구역 띠가 자기가 덮는 숫자 구간 아래에 오게 한다.
-     휠 순서로 계산한 각 구역의 자리:
-       VOISINS   윗줄 1~7   아랫줄 1~9    -> 폭 0.46   (0 바로 옆)
-       ORPHELINS 윗줄 8~10  아랫줄 10~14  -> 폭 0.23   (가운데)
-       TIERS     윗줄 11~17 아랫줄 15~18  -> 폭 0.32   (0 반대편)
-     위/아래 줄의 칸 수가 17 대 18 이라 경계가 미세하게 어긋난다. 두 값의 평균으로 잡았다.
-     실제 테이블도 타원이라 경계가 곡선이어서 딱 떨어지지 않는다. */
-  /* 구역 경계는 윗줄과 아랫줄에서 서로 다른 자리에 떨어진다.
-     예) VOISINS 는 윗줄 41.2% 에서, 아랫줄 50.0% 에서 끝난다.
-     실제 레이스트랙은 타원이라 이 경계선이 비스듬하게 그어진다.
-     네모로 그리면 한쪽 줄에만 맞아 어긋나 보이므로 사다리꼴로 자른다. */
-  .rt-sectors { position: relative; height: clamp(38px, 8.5vw, 50px); margin: 5px 0 3px; }
-  .rt-zerorow { position: relative; height: clamp(20px, 4.6vw, 26px); margin-bottom: 5px; }
-  .rt-sec { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            border: none; padding: 0; background: rgba(0,0,0,0.5); color: #FFD700;
-            font-weight: bold; cursor: pointer; transition: background 0.15s; }
-  .rt-sec:active { background: rgba(212,175,55,0.38); }
-  /* 라벨은 사다리꼴의 가로 중앙에 둔다 (JS 가 left 를 계산해서 넣는다) */
-  .rt-sec-in { position: absolute; top: 50%; transform: translate(-50%, -50%);
-               display: flex; flex-direction: column; align-items: center; gap: 1px;
-               white-space: nowrap; pointer-events: none; line-height: 1.1; }
-  .rt-sec-t { font-size: clamp(7px, 1.7vw, 13px); letter-spacing: 0.5px; }
-  .rt-sec small { color: #aaa; font-weight: normal; font-size: clamp(6px, 1.3vw, 10px); }
+
+  .rt-cell { cursor: pointer; stroke: rgba(255,255,255,0.5); stroke-width: 1.4; }
+  .rt-cell.red { fill: #c0392b; } .rt-cell.black { fill: #1c1c1c; } .rt-cell.zero { fill: #27ae60; }
+  .rt-cell:active { fill: #D4AF37; }
+  .rt-cell-t { fill: #fff; font-weight: bold; font-size: 22px; text-anchor: middle;
+               dominant-baseline: central; pointer-events: none; }
+
+  .rt-band { cursor: pointer; fill: rgba(0,0,0,0.45); stroke: #D4AF37; stroke-width: 1.6; }
+  .rt-band:active { fill: rgba(212,175,55,0.4); }
+  .rt-band-t { fill: #FFD700; font-weight: bold; font-size: 21px; letter-spacing: 1.5px;
+               text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .rt-band-s { fill: #b9b9b9; font-size: 14px; text-anchor: middle;
+               dominant-baseline: central; pointer-events: none; }
 
   /* 잔액은 왼쪽, 버튼 묶음은 오른쪽. space-around 로 5개를 흩뿌리면 간격이 들쭉날쭉해진다. */
   /* 잔액 -> Undo/Double/Clear 한 줄 -> 충전 한 줄, 위에서 아래로 쌓는다. */
@@ -790,67 +777,139 @@
   const viewTrackBtn = document.getElementById('viewTrack');
   let currentView = 'board';
 
+  /* 스타디움(양 끝이 반원인 타원) 둘레를 37등분해 칸을 배치한다.
+     t 는 둘레를 따라간 길이, off 는 바깥 경계에서 안쪽으로 들어간 거리.
+     t=0 이 왼쪽 꼭짓점이고 시계방향으로 증가한다. 0 번이 왼쪽 끝에 온다. */
+  const RT_RO = 130, RT_L = 740, RT_TN = 40, RT_TS = 46;   // 반지름 / 직선부 / 숫자띠 / 구역띠
+  const RT_W = RT_L + 2 * RT_RO;                 // 1000
+  const RT_H = 2 * RT_RO;                        // 260
+  const RT_QUARTER = Math.PI * RT_RO / 2;        // 90도 호 길이
+  const RT_PERIM = 2 * RT_L + 2 * Math.PI * RT_RO;
+  const RT_UNIT = RT_PERIM / 37;                 // 한 칸이 차지하는 둘레 길이
+
+  function rtPoint(t, off) {
+      t = ((t % RT_PERIM) + RT_PERIM) % RT_PERIM;
+      const r = RT_RO - off, cy = RT_RO, cxL = RT_RO, cxR = RT_RO + RT_L;
+      let a = t;
+      if (a < RT_QUARTER) {                              // 왼쪽 위 1/4 호
+          const th = Math.PI + a / RT_RO;
+          return [cxL + r * Math.cos(th), cy + r * Math.sin(th)];
+      }
+      a -= RT_QUARTER;
+      if (a < RT_L) return [RT_RO + a, off];             // 윗변
+      a -= RT_L;
+      if (a < 2 * RT_QUARTER) {                          // 오른쪽 반원
+          const th = -Math.PI / 2 + a / RT_RO;
+          return [cxR + r * Math.cos(th), cy + r * Math.sin(th)];
+      }
+      a -= 2 * RT_QUARTER;
+      if (a < RT_L) return [RT_RO + RT_L - a, RT_H - off];  // 아랫변 (오른쪽->왼쪽)
+      a -= RT_L;
+      const th = Math.PI / 2 + a / RT_RO;                // 왼쪽 아래 1/4 호
+      return [cxL + r * Math.cos(th), cy + r * Math.sin(th)];
+  }
+
+  // 둘레 구간 [t0,t1] 과 깊이 [offOut,offIn] 으로 둘러싸인 띠 모양 경로
+  function rtRing(t0, t1, offOut, offIn, steps) {
+      const p = [];
+      for (let i = 0; i <= steps; i++) p.push(rtPoint(t0 + (t1 - t0) * i / steps, offOut));
+      for (let i = steps; i >= 0; i--) p.push(rtPoint(t0 + (t1 - t0) * i / steps, offIn));
+      return 'M' + p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join('L') + 'Z';
+  }
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs) => {
+      const e = document.createElementNS(SVGNS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+  };
+
+  // 윗변 / 아랫변 위에 있는 t 인지 (라벨을 가로로 놓을 수 있는 구간)
+  function rtOnTop(t) { return t >= RT_QUARTER && t <= RT_QUARTER + RT_L; }
+  function rtOnBottom(t) { const a = 3 * RT_QUARTER + RT_L; return t >= a && t <= a + RT_L; }
+
   function buildRacetrack() {
-      const order = wheelNumEU;                  // 0 부터 시계방향 37칸
-      const top = order.slice(1, 18);            // 32 … 23   (17개, 왼→오)
-      const rightEnd = order[18];                // 10
-      const bottom = order.slice(19).reverse();  // 26 … 5    (18개, 왼→오)
+      const wheel = wheelNumEU;                      // 0 부터 시계방향 37칸
+      const svg = svgEl('svg', { viewBox: `0 0 ${RT_W} ${RT_H}`, role: 'group' });
 
-      function numCell(n) {
-          const d = document.createElement('div');
-          d.className = 'rt-num ' + (n === 0 ? 'zero' : (redNumbers.includes(n) ? 'red' : 'black'));
-          d.innerText = n;
-          d.title = `${n}번과 양옆 ${RT_NEIGHBOURS}개씩 · 숫자 ${RT_NEIGHBOURS * 2 + 1}개`;
-          d.addEventListener('click', () => placeNeighbourBet(n));
-          return d;
-      }
-      function row(nums) {
-          const r = document.createElement('div'); r.className = 'rt-row';
-          nums.forEach(n => r.appendChild(numCell(n)));
-          return r;
-      }
+      // ── 구역 띠 : 휠에서 연속된 구간 단위로 그린다.
+      //    Orphelins 는 실제로도 떨어진 두 덩어리라 두 조각으로 나온다.
+      const BANDS = [
+          { key: 'voisins',   from: 28, to: 44, label: 'VOISINS',   sub: '17 · 9칩' },  // 28~36,0~7
+          { key: 'orphelins', from: 8,  to: 10, label: 'ORPHELINS', sub: '8 · 5칩'  },
+          { key: 'tiers',     from: 11, to: 22, label: 'TIERS',     sub: '12 · 6칩' },
+          { key: 'orphelins', from: 23, to: 27, label: 'ORPHELINS', sub: '8 · 5칩'  }
+      ];
+      BANDS.forEach(b => {
+          const t0 = (b.from - 0.5) * RT_UNIT + 1.2;
+          const t1 = (b.to + 0.5) * RT_UNIT - 1.2;
+          const path = svgEl('path', { class: 'rt-band', d: rtRing(t0, t1, RT_TN + 3, RT_TN + RT_TS, 40) });
+          path.addEventListener('click', () => placeCallBet(b.key));
+          const info = CALL_BETS[b.key];
+          path.appendChild(svgEl('title', {})).textContent = `${info.name} · 숫자 ${b.sub}`;
+          svg.appendChild(path);
 
-      /* 각 구역이 윗줄·아랫줄에서 차지하는 구간(%). 휠 순서로 계산한 값이다.
-         윗줄 17칸, 아랫줄 18칸이라 같은 구역이라도 끝나는 위치가 다르다.
-         경계선 사이에 0.3% 씩 틈을 둬서 그 사이로 테이블 녹색이 비치게 했다. */
-      const SECTOR_SHAPE = {
-          voisins:   { t0: 0,    t1: 40.9, b0: 0,    b1: 49.7 },   // 윗줄 1~7   아랫줄 1~9
-          orphelins: { t0: 41.5, t1: 58.5, b0: 50.3, b1: 77.5 },   // 윗줄 8~10  아랫줄 10~14
-          tiers:     { t0: 59.1, t1: 100,  b0: 78.1, b1: 100  },   // 윗줄 11~17 아랫줄 15~18
-          zero:      { t0: 0,    t1: 11.3, b0: 0,    b1: 21.8 }    // 윗줄 1~2   아랫줄 1~4
-      };
+          // 라벨은 직선 구간에 가로로 놓는다. 곡선부에 놓으면 글자가 눕는다.
+          const flat = [];
+          for (let k = b.from; k <= b.to; k++) {
+              const t = (k % 37) * RT_UNIT + (k >= 37 ? RT_PERIM : 0);
+              const tt = ((t % RT_PERIM) + RT_PERIM) % RT_PERIM;
+              if (rtOnTop(tt) || rtOnBottom(tt)) flat.push(tt);
+          }
+          if (!flat.length) return;
+          flat.sort((x, y) => x - y);
+          // 직선 구간이 둘로 끊길 수 있으니 긴 쪽의 가운데를 쓴다
+          const runs = [[flat[0]]];
+          for (let i = 1; i < flat.length; i++) {
+              (flat[i] - flat[i - 1] < RT_UNIT * 1.6 ? runs[runs.length - 1] : runs[runs.push([]) - 1]).push(flat[i]);
+          }
+          // 윗변을 먼저 고른다. 그래야 위쪽에 VOISINS·ORPHELINS·TIERS 가
+          // 왼쪽부터 차례로 보이는 실제 테이블 모양이 나온다.
+          runs.sort((a, c) => {
+              const at = rtOnTop(a[0]) ? 1 : 0, ct = rtOnTop(c[0]) ? 1 : 0;
+              return at !== ct ? ct - at : c.length - a.length;
+          });
+          const run = runs[0];
+          const tm = (run[0] + run[run.length - 1]) / 2;
+          const [lx, ly] = rtPoint(tm, RT_TN + RT_TS / 2);
+          const t1El = svgEl('text', { class: 'rt-band-t', x: lx.toFixed(1), y: (ly - 8).toFixed(1) });
+          t1El.textContent = b.label;
+          const t2El = svgEl('text', { class: 'rt-band-s', x: lx.toFixed(1), y: (ly + 12).toFixed(1) });
+          t2El.textContent = b.sub;
+          svg.appendChild(t1El); svg.appendChild(t2El);
+      });
 
-      function sectorBtn(key, label, sub) {
-          const sh = SECTOR_SHAPE[key];
-          const b = document.createElement('button');
-          b.className = 'rt-sec';
-          b.style.clipPath = `polygon(${sh.t0}% 0%, ${sh.t1}% 0%, ${sh.b1}% 100%, ${sh.b0}% 100%)`;
-          const cx = (sh.t0 + sh.t1 + sh.b0 + sh.b1) / 4;      // 사다리꼴의 가로 중앙
-          b.innerHTML = `<span class="rt-sec-in" style="left:${cx.toFixed(1)}%">` +
-                        `<span class="rt-sec-t">${label}</span><small>${sub}</small></span>`;
-          b.title = `${CALL_BETS[key].name} · ${sub}`;
-          b.addEventListener('click', () => placeCallBet(key));
-          return b;
-      }
+      // ── 숫자 칸 37개
+      wheel.forEach((num, k) => {
+          const t0 = (k - 0.5) * RT_UNIT + 1.0, t1 = (k + 0.5) * RT_UNIT - 1.0;
+          const cls = num === 0 ? 'zero' : (redNumbers.includes(num) ? 'red' : 'black');
+          const cell = svgEl('path', { class: 'rt-cell ' + cls, d: rtRing(t0, t1, 0, RT_TN, 6) });
+          cell.addEventListener('click', () => placeNeighbourBet(num));
+          cell.appendChild(svgEl('title', {})).textContent =
+              `${num}번과 양옆 ${RT_NEIGHBOURS}개씩 · 숫자 ${RT_NEIGHBOURS * 2 + 1}개`;
+          svg.appendChild(cell);
 
-      // 왼쪽부터 순서대로. 0 옆이 VOISINS, 가운데가 ORPHELINS, 반대편이 TIERS 다.
-      const sectors = document.createElement('div'); sectors.className = 'rt-sectors';
-      [['voisins', 'VOISINS', '17 · 9칩'],
-       ['orphelins', 'ORPHELINS', '8 · 5칩'],
-       ['tiers', 'TIERS', '12 · 6칩']].forEach(([k, l, sub]) => sectors.appendChild(sectorBtn(k, l, sub)));
+          const [tx, ty] = rtPoint(k * RT_UNIT, RT_TN / 2);
+          const label = svgEl('text', { class: 'rt-cell-t', x: tx.toFixed(1), y: ty.toFixed(1) });
+          label.textContent = num;
+          svg.appendChild(label);
+      });
 
-      // JEU 0 은 VOISINS 안쪽에 겹치는 구간이라 같은 층에 두면 서로를 가린다. 아래 줄로 분리.
-      const zeroRow = document.createElement('div'); zeroRow.className = 'rt-zerorow';
-      zeroRow.appendChild(sectorBtn('zero', 'JEU 0', '7 · 4칩'));
-
-      const mid = document.createElement('div'); mid.className = 'rt-mid';
-      mid.appendChild(row(top)); mid.appendChild(sectors); mid.appendChild(zeroRow); mid.appendChild(row(bottom));
-
-      const left = document.createElement('div'); left.className = 'rt-end'; left.appendChild(numCell(0));
-      const right = document.createElement('div'); right.className = 'rt-end'; right.appendChild(numCell(rightEnd));
+      // ── 가운데 JEU 0 (0 양옆 일곱 칸. 다른 구역과 겹치므로 안쪽에 따로 둔다)
+      const zw = 190, zh = 62;
+      const zx = (RT_W - zw) / 2, zy = (RT_H - zh) / 2;
+      const zBtn = svgEl('rect', { class: 'rt-band', x: zx, y: zy, width: zw, height: zh, rx: 10 });
+      zBtn.addEventListener('click', () => placeCallBet('zero'));
+      zBtn.appendChild(svgEl('title', {})).textContent = `${CALL_BETS.zero.name} · 숫자 7 · 4칩`;
+      svg.appendChild(zBtn);
+      const z1 = svgEl('text', { class: 'rt-band-t', x: RT_W / 2, y: RT_H / 2 - 9 });
+      z1.textContent = 'JEU 0';
+      const z2 = svgEl('text', { class: 'rt-band-s', x: RT_W / 2, y: RT_H / 2 + 12 });
+      z2.textContent = '7 · 4칩';
+      svg.appendChild(z1); svg.appendChild(z2);
 
       rtEl.innerHTML = '';
-      rtEl.appendChild(left); rtEl.appendChild(mid); rtEl.appendChild(right);
+      rtEl.appendChild(svg);
   }
 
   /* 보드는 DOM 에 그대로 두고 화면 밖으로만 치운다.
