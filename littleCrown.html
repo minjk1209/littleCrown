@@ -151,15 +151,25 @@
             cursor: pointer; box-sizing: border-box; overflow: hidden; white-space: nowrap; line-height: 1; }
   .rt-num.red { background: #c0392b; } .rt-num.black { background: #1a1a1a; } .rt-num.zero { background: #27ae60; }
   .rt-end .rt-num { height: auto; border-radius: 60px; }
-  /* 4등분 그리드. flex 로 두면 글자 길이에 따라 "ORPHELINS" 만 잘려 들쭉날쭉해진다. */
-  .rt-calls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px 6px; }
-  .rt-call { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-             min-width: 0; padding: 9px 4px; background: rgba(0,0,0,0.45); color: #FFD700;
-             border: 1px solid #D4AF37; border-radius: 6px; font-weight: bold; line-height: 1.2; cursor: pointer; }
-  .rt-call-t { max-width: 100%; font-size: clamp(9px, 2.1vw, 14px); letter-spacing: 0.5px;
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rt-call small { max-width: 100%; color: #aaa; font-weight: normal; white-space: nowrap;
-                   overflow: hidden; text-overflow: ellipsis; font-size: clamp(7px, 1.6vw, 11px); }
+  /* 실제 레이스트랙처럼 구역 띠가 자기가 덮는 숫자 구간 아래에 오게 한다.
+     휠 순서로 계산한 각 구역의 자리:
+       VOISINS   윗줄 1~7   아랫줄 1~9    -> 폭 0.46   (0 바로 옆)
+       ORPHELINS 윗줄 8~10  아랫줄 10~14  -> 폭 0.23   (가운데)
+       TIERS     윗줄 11~17 아랫줄 15~18  -> 폭 0.32   (0 반대편)
+     위/아래 줄의 칸 수가 17 대 18 이라 경계가 미세하게 어긋난다. 두 값의 평균으로 잡았다.
+     실제 테이블도 타원이라 경계가 곡선이어서 딱 떨어지지 않는다. */
+  .rt-sectors { display: grid; grid-template-columns: 46fr 23fr 31fr; gap: 4px; padding: 7px 4px 3px; }
+  /* JEU 0 은 0 양옆 일곱 칸만 덮는 작은 베팅이라 왼쪽 끝에 짧게 둔다. */
+  .rt-zerorow { display: grid; grid-template-columns: 19fr 81fr; gap: 4px; padding: 0 4px 7px; }
+  .rt-sec { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            min-width: 0; min-height: 38px; padding: 6px 4px; border-radius: 5px;
+            background: rgba(0,0,0,0.45); border: 1px solid #D4AF37; color: #FFD700;
+            font-weight: bold; line-height: 1.15; cursor: pointer; transition: 0.15s; }
+  .rt-sec:active { background: rgba(212,175,55,0.3); }
+  .rt-sec-t { max-width: 100%; font-size: clamp(8px, 1.9vw, 13px); letter-spacing: 0.5px;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-sec small { max-width: 100%; color: #aaa; font-weight: normal; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; font-size: clamp(7px, 1.5vw, 10px); }
 
   /* 잔액은 왼쪽, 버튼 묶음은 오른쪽. space-around 로 5개를 흩뿌리면 간격이 들쭉날쭉해진다. */
   /* 잔액 -> Undo/Double/Clear 한 줄 -> 충전 한 줄, 위에서 아래로 쌓는다. */
@@ -259,11 +269,6 @@
     .shop-header h2 { font-size: 1.3rem; }
     .shop-body { padding: 12px; }
     .shop-tab { padding: 12px 0; font-size: 0.85rem; }
-  }
-
-  /* 폰 세로처럼 아주 좁을 때만 콜 벳을 2x2 로. 폰에서 제일 쓸모 있는 버튼이라 넓게 준다. */
-  @media (max-width: 480px) {
-    .rt-calls { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
@@ -801,18 +806,27 @@
           return r;
       }
 
-      const calls = document.createElement('div'); calls.className = 'rt-calls';
-      [['tiers', 'TIERS', '숫자12 · 칩6'], ['orphelins', 'ORPHELINS', '숫자8 · 칩5'],
-       ['voisins', 'VOISINS', '숫자17 · 칩9'], ['zero', 'JEU 0', '숫자7 · 칩4']].forEach(([k, label, sub]) => {
+      function sectorBtn(key, label, sub) {
           const b = document.createElement('button');
-          b.className = 'rt-call';
-          b.innerHTML = `<span class="rt-call-t">${label}</span><small>${sub}</small>`;
-          b.addEventListener('click', () => placeCallBet(k));
-          calls.appendChild(b);
-      });
+          b.className = 'rt-sec';
+          b.innerHTML = `<span class="rt-sec-t">${label}</span><small>${sub}</small>`;
+          b.title = `${CALL_BETS[key].name} · 숫자 ${sub}`;
+          b.addEventListener('click', () => placeCallBet(key));
+          return b;
+      }
+
+      // 왼쪽부터 순서대로. 0 옆이 VOISINS, 가운데가 ORPHELINS, 반대편이 TIERS 다.
+      const sectors = document.createElement('div'); sectors.className = 'rt-sectors';
+      [['voisins', 'VOISINS', '17 · 9칩'],
+       ['orphelins', 'ORPHELINS', '8 · 5칩'],
+       ['tiers', 'TIERS', '12 · 6칩']].forEach(([k, l, sub]) => sectors.appendChild(sectorBtn(k, l, sub)));
+
+      const zeroRow = document.createElement('div'); zeroRow.className = 'rt-zerorow';
+      zeroRow.appendChild(sectorBtn('zero', 'JEU 0', '7 · 4칩'));
+      zeroRow.appendChild(document.createElement('div'));   // 오른쪽은 비워 둔다
 
       const mid = document.createElement('div'); mid.className = 'rt-mid';
-      mid.appendChild(row(top)); mid.appendChild(calls); mid.appendChild(row(bottom));
+      mid.appendChild(row(top)); mid.appendChild(sectors); mid.appendChild(zeroRow); mid.appendChild(row(bottom));
 
       const left = document.createElement('div'); left.className = 'rt-end'; left.appendChild(numCell(0));
       const right = document.createElement('div'); right.className = 'rt-end'; right.appendChild(numCell(rightEnd));
