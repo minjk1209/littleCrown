@@ -121,8 +121,19 @@
   .out-cell { height: calc(var(--cell) * 0.8); font-size: calc(var(--cell) * 0.3); display: flex; align-items: center; justify-content: center; border: 1px solid #fff; cursor: pointer; font-weight: bold; box-sizing: border-box; margin-left: -1px; margin-top: -1px; white-space: nowrap; overflow: hidden; line-height: 1; } .out-cell:hover { background: rgba(255,255,255,0.1); } .spacer { border: none; visibility: hidden; }
 
   /* ───── 레이스트랙 : 휠에 박힌 순서대로 늘어놓은 콜 벳 입력판 (유럽 전용) ───── */
-  .rt-toggle { background: #34495e; color: #D4AF37; border: 2px solid #D4AF37; padding: 8px 22px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 12px; font-size: 0.95rem; transition: 0.2s; }
-  .rt-toggle.open { background: #D4AF37; color: #111; }
+  /* 베팅판 / 레이스트랙 화면 전환 탭 */
+  .view-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 560px; margin-bottom: 14px; }
+  .view-tab { padding: 10px 12px; border-radius: 10px 10px 0 0; border: 2px solid #4a3b2c; border-bottom: 3px solid #1e5631;
+              background: #2b2b2b; color: #9a9a9a; font-weight: bold; font-size: clamp(0.82rem, 1.8vw, 1rem);
+              cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s; }
+  .view-tab.active { background: #1e5631; color: #FFD700; border-color: #4a3b2c; border-bottom-color: #1e5631;
+                     box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); }
+  .view-tab:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* 레이스트랙 화면일 때 보드를 화면 밖으로 치운다. display:none 으로 숨기면
+     getBoundingClientRect 가 전부 0 이 되어 콜 벳 칩이 엉뚱한 자리에 놓인다.
+     칩 좌표는 보드 기준 상대값이라 밖으로 밀어내도 계산은 그대로 맞는다. */
+  .board-wrapper.offstage { position: absolute; left: -99999px; top: 0; }
   .racetrack { position: relative; display: none; width: 100%; max-width: 850px; margin-bottom: 15px; padding: 6px; box-sizing: border-box;
                background: #1e5631; border: 5px solid #4a3b2c; border-radius: 70px; box-shadow: inset 0 0 30px rgba(0,0,0,0.6); }
   .racetrack.locked::after { content: 'NO MORE BETS'; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -257,7 +268,7 @@
 
   /* 터치 기기에서는 :hover가 탭 후에도 남아 붙는다. 시각 효과만 끈다. */
   @media (hover: none) {
-    .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover, .rt-toggle:hover { transform: none; }
+    .btn-shop:hover, .dealer-avatar:hover, .btn-sys:hover, .chip:hover { transform: none; }
     .deck-opt:hover span { border-color: #3d6b45; color: #9fd8ab; }
     .deck-opt input:checked + span { border-color: #7ef7a8; color: #06230f; }
     .btn-shop:hover { filter: none; }
@@ -344,6 +355,11 @@
     </div>
   </div>
 
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" id="viewBoard">🎲 베팅판</button>
+    <button class="view-tab" id="viewTrack">🎯 레이스트랙</button>
+  </div>
+
   <div class="game-container" id="gameContainer">
     <div class="roulette-wrapper"><canvas id="rouletteCanvas" width="300" height="300"></canvas></div>
     <div class="board-wrapper" id="boardWrapper">
@@ -357,7 +373,6 @@
     </div>
   </div>
 
-  <button class="rt-toggle" id="rtToggle">🎯 레이스트랙</button>
   <div class="racetrack" id="racetrack"></div>
 
   <div class="panel-base system-panel">
@@ -760,8 +775,11 @@
       msgBox.innerText = `🎯 ${num}번 이웃 베팅 · ${picks.join(', ')} · 각 36배 · 총 $${cost.toLocaleString()}`;
   }
 
-  const rtToggle = document.getElementById('rtToggle');
   const rtEl = document.getElementById('racetrack');
+  const boardWrapEl = document.getElementById('boardWrapper');
+  const viewBoardBtn = document.getElementById('viewBoard');
+  const viewTrackBtn = document.getElementById('viewTrack');
+  let currentView = 'board';
 
   function buildRacetrack() {
       const order = wheelNumEU;                  // 0 부터 시계방향 37칸
@@ -803,19 +821,28 @@
       rtEl.appendChild(left); rtEl.appendChild(mid); rtEl.appendChild(right);
   }
 
-  function setRacetrackOpen(open) {
-      rtEl.classList.toggle('open', open);
-      rtToggle.classList.toggle('open', open);
-      rtToggle.innerText = open ? '🎯 레이스트랙 닫기' : '🎯 레이스트랙';
+  /* 보드는 DOM 에 그대로 두고 화면 밖으로만 치운다.
+     콜 벳 칩 위치를 보드 칸의 좌표로 계산하기 때문에 측정이 가능해야 한다. */
+  function setView(view) {
+      if (view === 'track' && currentTable !== 'EU') view = 'board';
+      currentView = view;
+      const onTrack = view === 'track';
+      boardWrapEl.classList.toggle('offstage', onTrack);
+      rtEl.classList.toggle('open', onTrack);
+      viewBoardBtn.classList.toggle('active', !onTrack);
+      viewTrackBtn.classList.toggle('active', onTrack);
   }
 
+  // 아메리칸 휠은 순서가 다르고 00 이 있어 콜 벳 구역이 정의되지 않는다.
   function updateRacetrackVisibility() {
       const isEU = currentTable === 'EU';
-      rtToggle.style.display = isEU ? '' : 'none';
-      if (!isEU) setRacetrackOpen(false);
+      viewTrackBtn.disabled = !isEU;
+      viewTrackBtn.title = isEU ? '' : '콜 벳은 유럽 테이블에서만 가능합니다';
+      setView(isEU ? currentView : 'board');
   }
 
-  rtToggle.addEventListener('click', () => setRacetrackOpen(!rtEl.classList.contains('open')));
+  viewBoardBtn.addEventListener('click', () => setView('board'));
+  viewTrackBtn.addEventListener('click', () => setView('track'));
   buildRacetrack();
 
   function bgNotice(text) {
@@ -1784,7 +1811,7 @@
       document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
   }
 
-  applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard();
+  applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); updateRacetrackVisibility();
   startAutoTimer();                 // 유럽: 30초부터
   startBackgroundTimer('AM');       // 아메리칸: 15초부터 (어긋나게)
 
