@@ -152,8 +152,10 @@
   /* stroke-width 는 viewBox 단위라 화면이 좁아지면 선도 같이 얇아진다.
      폰에서는 1픽셀 미만이 되어 반투명 회색으로 뭉개지며 전체가 흐릿해 보인다.
      non-scaling-stroke 로 화면 픽셀 기준으로 고정한다. */
-  .rt-cell { cursor: pointer; stroke: rgba(255,255,255,0.85); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-  .rt-cell.red { fill: #a81a11; } .rt-cell.black { fill: #0a0a0a; } .rt-cell.zero { fill: #12722f; }
+  /* 폰에서는 칸 하나가 24x22px 남짓이라, 밝고 굵은 테두리가 칸 면적의 20% 넘게
+     차지하면서 빨강은 연해지고 검정은 회색처럼 떴다. 테두리를 얇고 어둡게 낮춘다. */
+  .rt-cell { cursor: pointer; stroke: rgba(255,255,255,0.5); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+  .rt-cell.red { fill: #8f1109; } .rt-cell.black { fill: #000; } .rt-cell.zero { fill: #0e5c28; }
   .rt-cell:active { fill: #D4AF37; }
   .rt-cell-t { fill: #fff; font-weight: bold; font-size: 26px; text-anchor: middle;
                dominant-baseline: central; pointer-events: none; }
