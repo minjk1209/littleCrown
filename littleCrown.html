@@ -254,6 +254,26 @@
   .mw-label { color: #D4AF37; font-size: clamp(9px, 2vw, 12px); font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; }
   .mw-result { color: #fff; font-size: clamp(11px, 2.6vw, 16px); font-weight: bold; margin-top: 5px; min-height: 1.2em; }
 
+  /* 인게임 모달. 브라우저 기본 alert/confirm/prompt 를 대체한다.
+     VIP SHOP 모달(z-index 1000) 안에서도 열리므로 그보다 위에 둔다. */
+  .ui-modal { z-index: 1100; padding: 16px; }
+  .ui-box { width: min(420px, 100%); background: #141414; border: 3px solid #D4AF37; border-radius: 14px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.85); overflow: hidden; }
+  .ui-title { padding: 14px 18px; background: linear-gradient(to right, #111, #333, #111);
+              border-bottom: 2px solid #D4AF37; color: #FFD700; font-weight: bold;
+              font-size: clamp(0.95rem, 2.6vw, 1.15rem); letter-spacing: 1px; text-align: center; }
+  .ui-msg { padding: 18px; color: #e8e8e8; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
+            line-height: 1.6; white-space: pre-line; text-align: center; }
+  .ui-input { display: block; width: calc(100% - 36px); margin: 0 18px 16px; padding: 11px 12px;
+              background: #0a0a0a; color: #2ecc71; border: 2px inset #333; border-radius: 6px;
+              font-family: 'Courier New', monospace; font-size: 1rem; font-weight: bold; box-sizing: border-box; }
+  .ui-input:focus { outline: 2px solid #D4AF37; outline-offset: -2px; }
+  .ui-btns { display: flex; gap: 10px; padding: 0 18px 18px; }
+  .ui-btn { flex: 1; padding: 12px 10px; border-radius: 7px; font-weight: bold; cursor: pointer;
+            font-size: clamp(0.85rem, 2.4vw, 1rem); border: 2px solid; white-space: nowrap; }
+  .ui-btn-ok { background: linear-gradient(to bottom, #D4AF37, #a8861f); border-color: #FFD700; color: #111; }
+  .ui-btn-cancel { background: #2c3e50; border-color: #466680; color: #cfcfcf; }
+
   .ver-badge { position: fixed; left: 6px; bottom: 6px; z-index: 950; padding: 3px 8px; border-radius: 10px;
                background: rgba(0,0,0,0.6); color: #7f8c8d; font-size: 11px; font-weight: bold;
                pointer-events: none; letter-spacing: 0.5px; }
@@ -298,6 +318,18 @@
 
   <canvas id="fxCanvas"></canvas>
   <div class="ver-badge" id="verBadge"></div>
+
+  <div class="modal-overlay ui-modal" id="uiModal">
+    <div class="ui-box">
+      <div class="ui-title" id="uiTitle"></div>
+      <div class="ui-msg" id="uiMsg"></div>
+      <input class="ui-input" id="uiInput" autocomplete="off">
+      <div class="ui-btns">
+        <button class="ui-btn ui-btn-cancel" id="uiCancel">취소</button>
+        <button class="ui-btn ui-btn-ok" id="uiOk">확인</button>
+      </div>
+    </div>
+  </div>
 
   <div class="mini-wheel" id="miniWheel">
       <div class="mw-label" id="miniWheelLabel"></div>
@@ -445,6 +477,60 @@
 (function() {
   let balance = 500; let vaultBalance = 0; 
   let currentChip = 10; let placedBets = {}; let betHistory = []; let totalBetAmount = 0;
+
+  /* ═══════════ 인게임 모달 ═══════════
+     브라우저 기본 alert/confirm/prompt 는 폰에서 투박하고 주소가 그대로 노출된다.
+     반환값은 기존과 같게 맞췄다: 확인 -> true 또는 입력값, 취소 -> null.
+     그래서 호출부는 await 만 붙이면 된다. */
+  const uiModalEl = document.getElementById('uiModal');
+  const uiTitleEl = document.getElementById('uiTitle');
+  const uiMsgEl   = document.getElementById('uiMsg');
+  const uiInputEl = document.getElementById('uiInput');
+  const uiOkEl    = document.getElementById('uiOk');
+  const uiCancelEl = document.getElementById('uiCancel');
+  let uiResolve = null;
+
+  function uiFinish(value) {
+      if (!uiResolve) return;
+      const r = uiResolve; uiResolve = null;
+      uiModalEl.style.display = 'none';
+      document.removeEventListener('keydown', uiOnKey);
+      r(value);
+  }
+  function uiOnKey(e) {
+      if (e.key === 'Enter')  { e.preventDefault(); uiOkEl.click(); }
+      if (e.key === 'Escape') { e.preventDefault(); uiCancelEl.click(); }
+  }
+  uiOkEl.addEventListener('click', () =>
+      uiFinish(uiInputEl.style.display === 'none' ? true : uiInputEl.value));
+  uiCancelEl.addEventListener('click', () => uiFinish(null));
+  uiModalEl.addEventListener('click', e => { if (e.target === uiModalEl) uiFinish(null); });
+
+  function uiOpen(o) {
+      return new Promise(resolve => {
+          if (uiResolve) uiFinish(null);        // 앞선 창이 떠 있으면 닫는다
+          uiResolve = resolve;
+          uiTitleEl.innerText = o.title || '알림';
+          uiMsgEl.innerText = o.message || '';
+          uiMsgEl.style.display = o.message ? '' : 'none';
+          uiInputEl.style.display = o.input ? '' : 'none';
+          if (o.input) {
+              uiInputEl.value = o.value == null ? '' : o.value;
+              uiInputEl.placeholder = o.placeholder || '';
+              uiInputEl.inputMode = o.numeric ? 'numeric' : 'text';
+          }
+          uiOkEl.innerText = o.okText || '확인';
+          uiCancelEl.style.display = o.noCancel ? 'none' : '';
+          uiCancelEl.innerText = o.cancelText || '취소';
+          uiModalEl.style.display = 'flex';
+          document.addEventListener('keydown', uiOnKey);
+          if (o.input) setTimeout(() => { uiInputEl.focus(); uiInputEl.select(); }, 40);
+      });
+  }
+  const uiAlert   = (message, title) => uiOpen({ title: title || '알림', message, noCancel: true });
+  const uiConfirm = (message, title, okText) =>
+      uiOpen({ title: title || '확인', message, okText }).then(v => v === true);
+  const uiPrompt  = (message, o) => uiOpen(Object.assign({ title: '입력', message, input: true }, o || {}));
   const RECHARGE_AMOUNT = 9000;        // 한 번에 충전되는 금액
   const RECHARGE_DAILY_LIMIT = true;   // false 로 바꾸면 제한이 풀린다 (테스트용)
   let usedVouchers = JSON.parse(localStorage.getItem('casino_vip_used_vouchers')) || [];
@@ -514,12 +600,12 @@
               applyDealerImage(currentTable);
               try {
                   localStorage.setItem(currentTable === 'EU' ? 'casino_vip_img_eu' : 'casino_vip_img_am', small);
-                  alert("✅ 딜러 프로필이 등록되었습니다.");
+                  uiAlert("딜러 프로필이 등록되었습니다.", "✅ 등록 완료");
               } catch (err) {
                   // 저장에 실패해도 화면에는 이미 적용돼 있다. 그 사실을 정확히 알린다.
-                  alert("⚠️ 저장 공간이 부족해 사진을 보관하지 못했습니다.\n\n지금 화면에는 적용되지만 새로고침하면 사라집니다.\n금고의 '백업'으로 다른 데이터를 먼저 내보낸 뒤 정리해 보세요.");
+                  uiAlert("지금 화면에는 적용되지만 새로고침하면 사라집니다.\n금고의 '백업'으로 다른 데이터를 먼저 내보낸 뒤 정리해 보세요.", "⚠️ 저장 공간 부족");
               }
-          }).catch(err => alert("❌ " + err.message));
+          }).catch(err => uiAlert(err.message, "❌ 오류"));
       };
       reader.readAsDataURL(file);
   });
@@ -634,9 +720,9 @@
       });
   }
 
-  window.buyItem = function(id, price, category) {
-      if(balance < price) { alert("🚨 잔고가 부족합니다!"); return; }
-      if(confirm(`$${price.toLocaleString()} 을 지불하고 구매하시겠습니까?`)) {
+  window.buyItem = async function(id, price, category) {
+      if(balance < price) { uiAlert(`지갑에 $${balance.toLocaleString()} 밖에 없습니다.`, "🚨 잔고 부족"); return; }
+      if(await uiConfirm(`$${price.toLocaleString()} 을 지불하고 구매할까요?`, "🛒 구매 확인", "구매")) {
           balance -= price; inventory.push(id); saveBalances(); saveShop(); updateUI(); renderShop();
       }
   }
@@ -1734,13 +1820,25 @@
       saveBalances();
   }
   
-  document.getElementById('btnDeposit').addEventListener('click', () => {
-      let amt = parseInt(prompt(`금고에 입금할 금액을 입력하세요. (소지 금액: $${balance})`));
-      if (!isNaN(amt) && amt > 0 && amt <= balance) { balance -= amt; vaultBalance += amt; updateUI(); }
+  document.getElementById('btnDeposit').addEventListener('click', async () => {
+      const v = await uiPrompt(`지갑: $${balance.toLocaleString()}`,
+                               { title: '금고 입금', placeholder: '금액', numeric: true, okText: '입금' });
+      if (v === null) return;
+      const amt = parseInt(v);
+      if (isNaN(amt) || amt <= 0) { msgBox.innerText = "입금 금액이 올바르지 않습니다."; return; }
+      if (amt > balance) { msgBox.innerText = `지갑에 $${balance.toLocaleString()} 밖에 없습니다.`; return; }
+      balance -= amt; vaultBalance += amt; updateUI();
+      msgBox.innerText = `🏦 금고에 $${amt.toLocaleString()} 입금했습니다.`;
   });
-  document.getElementById('btnWithdraw').addEventListener('click', () => {
-      let amt = parseInt(prompt(`출금할 금액을 입력하세요. (금고 잔액: $${vaultBalance})`));
-      if (!isNaN(amt) && amt > 0 && amt <= vaultBalance) { vaultBalance -= amt; balance += amt; updateUI(); }
+  document.getElementById('btnWithdraw').addEventListener('click', async () => {
+      const v = await uiPrompt(`금고: $${vaultBalance.toLocaleString()}`,
+                               { title: '금고 출금', placeholder: '금액', numeric: true, okText: '출금' });
+      if (v === null) return;
+      const amt = parseInt(v);
+      if (isNaN(amt) || amt <= 0) { msgBox.innerText = "출금 금액이 올바르지 않습니다."; return; }
+      if (amt > vaultBalance) { msgBox.innerText = `금고에 $${vaultBalance.toLocaleString()} 밖에 없습니다.`; return; }
+      vaultBalance -= amt; balance += amt; updateUI();
+      msgBox.innerText = `🏦 금고에서 $${amt.toLocaleString()} 출금했습니다.`;
   });
   
   /* 클립보드 API 는 HTTPS 에서만 동작하고 권한이 막힐 수도 있다.
@@ -1766,7 +1864,8 @@
   }
 
   document.getElementById('btnIssueVoucher').addEventListener('click', async () => {
-      const input = prompt("수표 발행 금액:");
+      const input = await uiPrompt(`지갑: $${balance.toLocaleString()}`,
+                                   { title: '수표 발행', placeholder: '금액', numeric: true, okText: '발행' });
       if (input === null) return;
       const amt = parseInt(input);
       if (isNaN(amt) || amt <= 0) { msgBox.innerText = "발행 금액이 올바르지 않습니다."; return; }
@@ -1781,32 +1880,29 @@
       const copied = await copyToClipboard(code);
       if (copied) {
           msgBox.innerText = `🧾 수표 $${amt.toLocaleString()} 발행 · 코드를 클립보드에 복사했습니다.`;
-          alert(`🧾 수표가 발행되었습니다.
-
-${code}
-
-📋 코드를 클립보드에 복사했습니다.
-어디든 붙여넣어 보관하세요.`);
+          await uiAlert(`${code}\n\n📋 클립보드에 복사했습니다. 어디든 붙여넣어 보관하세요.`, "🧾 수표 발행 완료");
       } else {
           // alert 안의 글자는 선택이 안 된다. prompt 는 선택·복사가 된다.
           msgBox.innerText = `🧾 수표 $${amt.toLocaleString()} 발행 · 아래 코드를 복사해 두세요.`;
-          prompt("🧾 수표 코드입니다. 길게 눌러(또는 Ctrl+C) 복사하세요.", code);
+          await uiPrompt("아래 코드를 복사해 보관하세요.", { title: "🧾 수표 발행 완료", value: code, noCancel: true });
       }
   });
   
-  document.getElementById('btnRedeemVoucher').addEventListener('click', () => {
-      let code = prompt("바우처 코드 입력:"); if(!code) return;
+  document.getElementById('btnRedeemVoucher').addEventListener('click', async () => {
+      const code = await uiPrompt('발행된 수표 코드를 붙여넣으세요.',
+                                  { title: '수표 입금', placeholder: 'SEC-...', okText: '입금' });
+      if (!code) return;
       
       if(code.trim().toUpperCase() === "VIP-GOLD-777") {
           balance = 0; vaultBalance = 0; updateUI(); resetBoardState();
-          alert("🚨 [카지노 보안국 알림]\n\n비정상적인 버그 악용 기록이 적발되었습니다.\n귀하의 지갑과 금고의 모든 자산이 0원으로 강제 압류되었습니다.\n\n- Casino Security -"); 
+          uiAlert("비정상적인 버그 악용 기록이 적발되었습니다.\n귀하의 지갑과 금고의 모든 자산이 0원으로 강제 압류되었습니다.\n\n- Casino Security -", "🚨 카지노 보안국"); 
           return;
       }
       
       let p = code.split('-'); 
       
       if(p[0] === "VIP") {
-          alert("🚨 [보안 경고] 구 버전 바우처(VIP-***)는 신규 보안 갱신으로 인해 모두 만료 및 폐기되었습니다.");
+          uiAlert("구 버전 바우처(VIP-***)는 신규 보안 갱신으로 모두 만료·폐기되었습니다.", "🚨 보안 경고");
           return;
       }
       
@@ -1819,23 +1915,23 @@ ${code}
           // 체크섬 알고리즘이 이 파일 안에 그대로 들어 있어서 진짜 위조는 어차피 막지 못한다.
           // 몰수는 코드를 한 글자 잘못 옮겨적은 사람만 처벌하게 되므로 그냥 거절한다.
           if (providedChecksum !== expectedChecksum) {
-              alert("❌ 코드가 올바르지 않습니다.\n\n오타가 없는지 다시 확인해 주세요.\n(자산에는 아무 변화도 없습니다)");
+              uiAlert("오타가 없는지 다시 확인해 주세요.\n(자산에는 아무 변화도 없습니다)", "❌ 코드가 올바르지 않습니다");
               return;
           }
 
           let uniqueId = rand + providedChecksum;
           if(usedVouchers.includes(uniqueId)) {
               // 클립보드에 남은 코드를 다시 붙여넣는 실수로도 걸리므로 몰수하지 않는다.
-              alert("❌ 이미 사용된 수표입니다.\n\n한 번 입금한 수표는 다시 쓸 수 없습니다.\n(자산에는 아무 변화도 없습니다)");
+              uiAlert("한 번 입금한 수표는 다시 쓸 수 없습니다.\n(자산에는 아무 변화도 없습니다)", "❌ 이미 사용된 수표");
           } else {
               balance+=amt; 
               usedVouchers.push(uniqueId); 
               localStorage.setItem('casino_vip_used_vouchers', JSON.stringify(usedVouchers));
               updateUI(); 
-              alert(`✅ 입금 완료: $${amt.toLocaleString()} 정상 충전 및 해당 수표 영구 폐기 완료.`);
+              uiAlert(`$${amt.toLocaleString()} 이 지갑에 들어왔습니다.\n해당 수표는 영구 폐기되었습니다.`, "✅ 수표 입금 완료");
           }
       } else {
-          alert("❌ 유효하지 않은 바우처 코드 형식입니다.");
+          uiAlert("SEC-금액-코드-검증 형식이어야 합니다.", "❌ 형식 오류");
       }
   });
   
@@ -1925,35 +2021,35 @@ ${code}
       // 마지막 수단
       try {
           await navigator.clipboard.writeText(json);
-          alert("📋 파일로 저장할 수 없어 백업 내용을 클립보드에 복사했습니다.\n메모장 등에 붙여넣어 보관하세요.");
+          await uiAlert("파일로 저장할 수 없어 백업 내용을 클립보드에 복사했습니다.\n메모장 등에 붙여넣어 보관하세요.", "📋 클립보드에 복사");
       } catch (err) {
-          alert("❌ 백업을 내보내지 못했습니다.");
+          await uiAlert("백업을 내보내지 못했습니다.", "❌ 오류");
       }
   }
 
-  function applySaveData(text) {
+  async function applySaveData(text) {
       let parsed;
       try { parsed = JSON.parse(text); }
-      catch (e) { alert("❌ 백업 파일을 읽을 수 없습니다. (형식 오류)"); return; }
+      catch (e) { uiAlert("백업 파일을 읽을 수 없습니다. (형식 오류)", "❌ 복원 실패"); return; }
 
       if (!parsed || parsed.app !== 'littlecrown' || !parsed.data) {
-          alert("❌ Little Crown 백업 파일이 아닙니다."); return;
+          uiAlert("Little Crown 백업 파일이 아닙니다.", "❌ 복원 실패"); return;
       }
       const incoming = SAVE_KEYS.filter(k => k in parsed.data);
-      if (incoming.length === 0) { alert("❌ 복원할 데이터가 들어 있지 않습니다."); return; }
+      if (incoming.length === 0) { uiAlert("복원할 데이터가 들어 있지 않습니다.", "❌ 복원 실패"); return; }
 
       const when = parsed.savedAt ? new Date(parsed.savedAt).toLocaleString() : '알 수 없음';
       const bal = Number(parsed.data['casino_vip_balance_uni'] || 0).toLocaleString();
       const vault = Number(parsed.data['casino_vip_vault_uni'] || 0).toLocaleString();
-      if (!confirm(`백업 시점: ${when}\n지갑: $${bal}   금고: $${vault}\n\n지금 이 기기의 데이터를 모두 덮어씁니다. 계속할까요?`)) return;
+      if (!await uiConfirm(`백업 시점: ${when}\n지갑: $${bal}   금고: $${vault}\n\n지금 이 기기의 데이터를 모두 덮어씁니다.`, "📂 복원 확인", "덮어쓰기")) return;
 
       try {
           SAVE_KEYS.forEach(k => localStorage.removeItem(k));
           incoming.forEach(k => localStorage.setItem(k, parsed.data[k]));
       } catch (err) {
-          alert("❌ 저장 공간이 부족해 복원하지 못했습니다."); return;
+          uiAlert("저장 공간이 부족해 복원하지 못했습니다.", "❌ 복원 실패"); return;
       }
-      alert("✅ 복원했습니다. 화면을 다시 불러옵니다.");
+      await uiAlert("복원했습니다. 화면을 다시 불러옵니다.", "✅ 복원 완료");
       location.reload();
   }
 
@@ -1966,7 +2062,7 @@ ${code}
       if (!f) return;
       const r = new FileReader();
       r.onload = ev => applySaveData(ev.target.result);
-      r.onerror = () => alert("❌ 파일을 읽지 못했습니다.");
+      r.onerror = () => uiAlert("파일을 읽지 못했습니다.", "❌ 오류");
       r.readAsText(f);
   });
 
@@ -1996,7 +2092,7 @@ ${code}
       document.getElementById('coldDisplay').innerText = sorted.slice(-3).reverse().join(',');
   }
 
-  const APP_VERSION = 'v39';   // sw.js 의 CACHE 버전과 함께 올린다
+  const APP_VERSION = 'v40';   // sw.js 의 CACHE 버전과 함께 올린다
   document.getElementById('verBadge').innerText = APP_VERSION;
 
   applyEquippedSkins(); buildBoard(); drawWheelStatic(); updateUI(); updateAnalyticsBoard(); updateRacetrackVisibility();
